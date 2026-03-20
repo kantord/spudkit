@@ -68,7 +68,7 @@
                 const res = await fetch('/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cmd: ['python3', '/calculate.py', a, b, op] })
+                    body: JSON.stringify({ cmd: ['/calculate.sh', a, b, op] })
                 });
                 const text = await res.text();
                 const data = JSON.parse(text);
