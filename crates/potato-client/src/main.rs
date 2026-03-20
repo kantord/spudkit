@@ -2,6 +2,7 @@
 
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
+use tauri::Manager;
 
 fn fetch_from_socket(path: &str) -> Result<Vec<u8>, String> {
     let mut stream = UnixStream::connect("/tmp/potato.sock")
@@ -24,15 +25,54 @@ fn fetch_from_socket(path: &str) -> Result<Vec<u8>, String> {
     }
 }
 
-#[tauri::command]
-fn load_file(path: String) -> Result<String, String> {
-    let bytes = fetch_from_socket(&path)?;
-    String::from_utf8(bytes).map_err(|e| e.to_string())
+fn mime_for_path(path: &str) -> &'static str {
+    if path.ends_with(".html") || path == "/" || path == "" {
+        "text/html"
+    } else if path.ends_with(".js") {
+        "application/javascript"
+    } else if path.ends_with(".css") {
+        "text/css"
+    } else if path.ends_with(".json") {
+        "application/json"
+    } else if path.ends_with(".png") {
+        "image/png"
+    } else if path.ends_with(".svg") {
+        "image/svg+xml"
+    } else if path.ends_with(".woff2") {
+        "font/woff2"
+    } else {
+        "application/octet-stream"
+    }
 }
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![load_file])
+        .register_uri_scheme_protocol("potato", |_ctx, request| {
+            let mut path = request.uri().path().to_string();
+            if path == "/" || path.is_empty() {
+                path = "/index.html".to_string();
+            }
+
+            let file_path = format!("/files{path}");
+
+            match fetch_from_socket(&file_path) {
+                Ok(body) => tauri::http::Response::builder()
+                    .status(200)
+                    .header("Content-Type", mime_for_path(&path))
+                    .body(body)
+                    .unwrap(),
+                Err(e) => tauri::http::Response::builder()
+                    .status(500)
+                    .header("Content-Type", "text/plain")
+                    .body(e.into_bytes())
+                    .unwrap(),
+            }
+        })
+        .setup(|app| {
+            let window = app.get_webview_window("main").unwrap();
+            window.navigate("potato://localhost".parse().unwrap())?;
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error running tauri app");
 }

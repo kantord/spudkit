@@ -7,19 +7,65 @@
         body {
             font-family: sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
+            justify-content: center;
             height: 100vh;
             margin: 0;
             background: #1a1a2e;
             color: #eee;
         }
-        h1 {
-            font-size: 3rem;
+        h1 { font-size: 3rem; margin-bottom: 2rem; }
+        .calc {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        input {
+            width: 80px;
+            padding: 0.5rem;
+            font-size: 1.2rem;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background: #16213e;
+            color: #eee;
+            text-align: center;
+        }
+        button {
+            padding: 0.5rem 1rem;
+            font-size: 1.2rem;
+            border-radius: 4px;
+            border: none;
+            background: #e94560;
+            color: #eee;
+            cursor: pointer;
+        }
+        button:hover { background: #c73e54; }
+        #result {
+            font-size: 1.5rem;
+            margin-top: 1rem;
         }
     </style>
 </head>
 <body>
     <h1>Hello from Potato!</h1>
+    <div class="calc">
+        <input type="number" id="a" value="0">
+        <input type="number" id="b" value="0">
+    </div>
+    <div class="calc">
+        <button onclick="calc('+')">Add</button>
+        <button onclick="calc('*')">Multiply</button>
+    </div>
+    <div id="result"></div>
+    <script>
+        function calc(op) {
+            const a = parseFloat(document.getElementById('a').value) || 0;
+            const b = parseFloat(document.getElementById('b').value) || 0;
+            const result = op === '+' ? a + b : a * b;
+            document.getElementById('result').textContent = `${a} ${op} ${b} = ${result}`;
+        }
+    </script>
 </body>
 </html>
