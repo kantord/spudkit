@@ -1,6 +1,7 @@
 use axum::{Router, extract::Path, routing::get};
 use bollard::Docker;
-use bollard::container::{Config, CreateContainerOptions, LogsOptions, RemoveContainerOptions};
+use bollard::models::ContainerCreateBody;
+use bollard::query_parameters::{CreateContainerOptions, LogsOptions, RemoveContainerOptions};
 use futures_util::StreamExt;
 
 async fn run_command(Path(command): Path<String>) -> String {
@@ -9,31 +10,34 @@ async fn run_command(Path(command): Path<String>) -> String {
         Err(e) => return format!("error connecting to docker: {e}\n"),
     };
 
-    let config = Config {
-        image: Some("debian:bookworm-slim"),
-        cmd: Some(vec![&command]),
+    let config = ContainerCreateBody {
+        image: Some("debian:bookworm-slim".to_string()),
+        cmd: Some(vec![command]),
         ..Default::default()
     };
 
     let name = format!("potato-{}", uuid());
     let container = match docker
-        .create_container(Some(CreateContainerOptions { name: name.as_str(), platform: None }), config)
+        .create_container(
+            Some(CreateContainerOptions { name: Some(name), ..Default::default() }),
+            config,
+        )
         .await
     {
         Ok(c) => c,
         Err(e) => return format!("error creating container: {e}\n"),
     };
 
-    if let Err(e) = docker.start_container::<String>(&container.id, None).await {
+    if let Err(e) = docker.start_container(&container.id, None).await {
         let _ = docker.remove_container(&container.id, None).await;
         return format!("error starting container: {e}\n");
     }
 
-    let wait = docker.wait_container::<String>(&container.id, None);
+    let wait = docker.wait_container(&container.id, None);
     let _: Vec<_> = wait.collect().await;
 
     let mut output = String::new();
-    let mut logs = docker.logs::<String>(
+    let mut logs = docker.logs(
         &container.id,
         Some(LogsOptions {
             follow: false,
