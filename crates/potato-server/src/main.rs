@@ -6,7 +6,7 @@ async fn main() {
     let _ = std::fs::remove_file(path);
 
     println!("Extracting image filesystem...");
-    let static_dir = potato_server::extract_image("debian:bookworm-slim")
+    let static_dir = potato_server::extract_image("potato-hello-world")
         .await
         .expect("failed to extract image");
     println!("Extracted to {}", static_dir.display());

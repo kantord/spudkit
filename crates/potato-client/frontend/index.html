@@ -5,12 +5,11 @@
     <title>Potato</title>
 </head>
 <body>
-    <h1>Potato</h1>
-    <pre id="output">Loading...</pre>
+    <div id="app">Loading...</div>
     <script>
-        window.__TAURI__.core.invoke('load_file', { path: '/files/etc/os-release' })
-            .then(text => document.getElementById('output').textContent = text)
-            .catch(err => document.getElementById('output').textContent = 'Error: ' + err);
+        window.__TAURI__.core.invoke('load_file', { path: '/files/index.html' })
+            .then(html => document.getElementById('app').innerHTML = html)
+            .catch(err => document.getElementById('app').textContent = 'Error: ' + err);
     </script>
 </body>
 </html>
