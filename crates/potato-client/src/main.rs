@@ -4,15 +4,27 @@ use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use tauri::Manager;
 
-fn fetch_from_socket(path: &str) -> Result<Vec<u8>, String> {
+fn forward_to_socket(method: &str, path: &str, body: Option<&[u8]>) -> Result<Vec<u8>, String> {
     let mut stream = UnixStream::connect("/tmp/potato.sock")
         .map_err(|e| format!("failed to connect to socket: {e}"))?;
 
-    let request = format!(
-        "GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    let mut request = format!(
+        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"
     );
+    if let Some(b) = body {
+        request.push_str(&format!(
+            "Content-Type: application/json\r\nContent-Length: {}\r\n",
+            b.len()
+        ));
+    }
+    request.push_str("\r\n");
+
     stream.write_all(request.as_bytes())
         .map_err(|e| format!("failed to write: {e}"))?;
+    if let Some(b) = body {
+        stream.write_all(b)
+            .map_err(|e| format!("failed to write body: {e}"))?;
+    }
 
     let mut response = Vec::new();
     stream.read_to_end(&mut response)
@@ -26,7 +38,7 @@ fn fetch_from_socket(path: &str) -> Result<Vec<u8>, String> {
 }
 
 fn mime_for_path(path: &str) -> &'static str {
-    if path.ends_with(".html") || path == "/" || path == "" {
+    if path.ends_with(".html") || path == "/index.html" {
         "text/html"
     } else if path.ends_with(".js") {
         "application/javascript"
@@ -48,19 +60,40 @@ fn mime_for_path(path: &str) -> &'static str {
 fn main() {
     tauri::Builder::default()
         .register_uri_scheme_protocol("potato", |_ctx, request| {
+            let method = request.method().as_str().to_string();
             let mut path = request.uri().path().to_string();
-            if path == "/" || path.is_empty() {
-                path = "/index.html".to_string();
-            }
 
-            let file_path = format!("/files{path}");
+            let body_bytes = request.into_body();
+            let body = if !body_bytes.is_empty() {
+                Some(body_bytes)
+            } else {
+                None
+            };
 
-            match fetch_from_socket(&file_path) {
-                Ok(body) => tauri::http::Response::builder()
-                    .status(200)
-                    .header("Content-Type", mime_for_path(&path))
-                    .body(body)
-                    .unwrap(),
+            // Route: /run goes directly, everything else is a file
+            let server_path = if path.starts_with("/run") {
+                path.clone()
+            } else {
+                if path == "/" || path.is_empty() {
+                    path = "/index.html".to_string();
+                }
+                format!("/files{path}")
+            };
+
+            match forward_to_socket(&method, &server_path, body.as_deref()) {
+                Ok(response_body) => {
+                    let mime = if path.starts_with("/run") {
+                        "application/json"
+                    } else {
+                        mime_for_path(&path)
+                    };
+
+                    tauri::http::Response::builder()
+                        .status(200)
+                        .header("Content-Type", mime)
+                        .body(response_body)
+                        .unwrap()
+                }
                 Err(e) => tauri::http::Response::builder()
                     .status(500)
                     .header("Content-Type", "text/plain")

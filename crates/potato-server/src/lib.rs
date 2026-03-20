@@ -1,4 +1,4 @@
-use axum::{Router, extract::Path, routing::get};
+use axum::{Json, Router, extract::State, routing::post};
 use bollard::Docker;
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{CreateContainerOptions, LogsOptions, RemoveContainerOptions};
@@ -6,15 +6,25 @@ use futures_util::StreamExt;
 use std::path::PathBuf;
 use tower_http::services::ServeDir;
 
-async fn run_command(Path(command): Path<String>) -> String {
+#[derive(Clone)]
+struct AppState {
+    image: String,
+}
+
+#[derive(serde::Deserialize)]
+struct RunRequest {
+    cmd: Vec<String>,
+}
+
+async fn run_command(State(state): State<AppState>, Json(body): Json<RunRequest>) -> String {
     let docker = match Docker::connect_with_local_defaults() {
         Ok(d) => d,
         Err(e) => return format!("error connecting to docker: {e}\n"),
     };
 
     let config = ContainerCreateBody {
-        image: Some("debian:bookworm-slim".to_string()),
-        cmd: Some(vec![command]),
+        image: Some(state.image),
+        cmd: Some(body.cmd),
         ..Default::default()
     };
 
@@ -108,8 +118,10 @@ fn uuid() -> String {
     format!("{n:x}")
 }
 
-pub fn app(static_dir: PathBuf) -> Router {
+pub fn app(static_dir: PathBuf, image: String) -> Router {
+    let state = AppState { image };
     Router::new()
-        .route("/run/{command}", get(run_command))
+        .route("/run", post(run_command))
         .nest_service("/files", ServeDir::new(static_dir))
+        .with_state(state)
 }

@@ -6,7 +6,7 @@ use tower::ServiceExt;
 
 fn test_app() -> axum::Router {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    potato_server::app(dir)
+    potato_server::app(dir, "debian:bookworm-slim".to_string())
 }
 
 #[tokio::test]
@@ -14,7 +14,12 @@ async fn run_date_returns_output() {
     let app = test_app();
 
     let response = app
-        .oneshot(Request::get("/run/date").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::post("/run")
+                .header("Content-Type", "application/json")
+                .body(Body::from(r#"{"cmd":["date"]}"#))
+                .unwrap(),
+        )
         .await
         .unwrap();
 
@@ -31,8 +36,11 @@ async fn run_nonexistent_command_returns_error() {
 
     let response = app
         .oneshot(
-            Request::get("/run/nonexistent_command_that_does_not_exist_abc123")
-                .body(Body::empty())
+            Request::post("/run")
+                .header("Content-Type", "application/json")
+                .body(Body::from(
+                    r#"{"cmd":["nonexistent_command_that_does_not_exist_abc123"]}"#,
+                ))
                 .unwrap(),
         )
         .await
@@ -53,11 +61,20 @@ async fn run_echo_returns_output() {
     let app = test_app();
 
     let response = app
-        .oneshot(Request::get("/run/echo").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::post("/run")
+                .header("Content-Type", "application/json")
+                .body(Body::from(r#"{"cmd":["echo","hello"]}"#))
+                .unwrap(),
+        )
         .await
         .unwrap();
 
     assert_eq!(response.status(), 200);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let text = String::from_utf8(body.to_vec()).unwrap();
+    assert!(text.contains("hello"));
 }
 
 #[tokio::test]
