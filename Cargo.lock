@@ -2654,6 +2654,7 @@ name = "potato-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "potato-transport",
  "serde",
  "serde_json",
 ]
@@ -2662,6 +2663,7 @@ dependencies = [
 name = "potato-gui"
 version = "0.1.0"
 dependencies = [
+ "potato-transport",
  "serde_json",
  "tauri",
  "tauri-build",
@@ -2690,6 +2692,14 @@ dependencies = [
  "tower",
  "tower-http",
  "uuid",
+]
+
+[[package]]
+name = "potato-transport"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,108 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::io::{BufRead, BufReader, Read, Write};
-use std::os::unix::net::UnixStream;
+use potato_transport::{http_request, stream_sse_raw};
 use tauri::Manager;
 use tauri::ipc::Channel;
 use tauri::webview::WebviewWindowBuilder;
 
 struct SocketPath(String);
 
-fn forward_to_socket(
-    socket_path: &str,
-    method: &str,
-    path: &str,
-    body: Option<&[u8]>,
-) -> Result<Vec<u8>, String> {
-    let mut stream = UnixStream::connect(socket_path)
-        .map_err(|e| format!("failed to connect to socket: {e}"))?;
-
-    let mut request =
-        format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n");
-    if let Some(b) = body {
-        request.push_str(&format!(
-            "Content-Type: application/json\r\nContent-Length: {}\r\n",
-            b.len()
-        ));
-    }
-    request.push_str("\r\n");
-
-    stream
-        .write_all(request.as_bytes())
-        .map_err(|e| format!("failed to write: {e}"))?;
-    if let Some(b) = body {
-        stream
-            .write_all(b)
-            .map_err(|e| format!("failed to write body: {e}"))?;
-    }
-
-    let mut response = Vec::new();
-    stream
-        .read_to_end(&mut response)
-        .map_err(|e| format!("failed to read: {e}"))?;
-
-    if let Some(pos) = String::from_utf8_lossy(&response).find("\r\n\r\n") {
-        Ok(response[pos + 4..].to_vec())
-    } else {
-        Ok(response)
-    }
-}
-
-fn read_sse_lines(
-    socket_path: &str,
-    method: &str,
-    path: &str,
-    body: Option<&[u8]>,
-    on_event: &Channel<String>,
-) -> Result<(), String> {
-    let mut stream = UnixStream::connect(socket_path)
-        .map_err(|e| format!("failed to connect to socket: {e}"))?;
-
-    let mut request =
-        format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n");
-    if let Some(b) = body {
-        request.push_str(&format!(
-            "Content-Type: application/json\r\nContent-Length: {}\r\n",
-            b.len()
-        ));
-    }
-    request.push_str("\r\n");
-
-    stream
-        .write_all(request.as_bytes())
-        .map_err(|e| format!("failed to write: {e}"))?;
-    if let Some(b) = body {
-        stream
-            .write_all(b)
-            .map_err(|e| format!("failed to write body: {e}"))?;
-    }
-
-    let reader = BufReader::new(stream);
-    let mut past_headers = false;
-
-    for line in reader.lines() {
-        let line = line.map_err(|e| format!("failed to read: {e}"))?;
-
-        if !past_headers {
-            if line.is_empty() {
-                past_headers = true;
-            }
-            continue;
-        }
-
-        if let Some(data) = line.strip_prefix("data:") {
-            let data = data.trim();
-            if !data.is_empty() {
-                let _ = on_event.send(data.to_string());
-            }
-        }
-    }
-
-    let _ = on_event.send(r#"{"event":"end"}"#.to_string());
-    Ok(())
-}
-
-// POST /calls — now returns SSE stream
 #[tauri::command]
 async fn create_call(
     state: tauri::State<'_, SocketPath>,
@@ -112,13 +16,16 @@ async fn create_call(
     let socket_path = state.0.clone();
 
     tokio::task::spawn_blocking(move || {
-        read_sse_lines(
+        stream_sse_raw(
             &socket_path,
             "POST",
             "/calls",
             Some(body.as_bytes()),
-            &on_event,
-        )
+            |data| {
+                let _ = on_event.send(data.to_string());
+            },
+        );
+        Ok::<(), String>(())
     })
     .await
     .map_err(|e| format!("task failed: {e}"))?
@@ -134,7 +41,8 @@ async fn send_call_stdin(
     let path = format!("/calls/{call_id}/stdin");
 
     tokio::task::spawn_blocking(move || {
-        let response = forward_to_socket(&socket_path, "POST", &path, Some(data.as_bytes()))?;
+        let response = http_request(&socket_path, "POST", &path, Some(data.as_bytes()))
+            .map_err(|e| e.to_string())?;
         String::from_utf8(response).map_err(|e| format!("invalid response: {e}"))
     })
     .await
@@ -163,7 +71,7 @@ fn mime_for_path(path: &str) -> &'static str {
 
 fn activate_app(app_name: &str) {
     let body = serde_json::json!({ "image": app_name });
-    let response = forward_to_socket(
+    let response = http_request(
         "/tmp/potato.sock",
         "POST",
         "/activate",
@@ -201,7 +109,7 @@ fn main() {
             }
             let server_path = format!("/files{path}");
 
-            match forward_to_socket(&socket_path_for_protocol, "GET", &server_path, None) {
+            match http_request(&socket_path_for_protocol, "GET", &server_path, None) {
                 Ok(response_body) => tauri::http::Response::builder()
                     .status(200)
                     .header("Content-Type", mime_for_path(&path))
@@ -210,7 +118,7 @@ fn main() {
                 Err(e) => tauri::http::Response::builder()
                     .status(500)
                     .header("Content-Type", "text/plain")
-                    .body(e.into_bytes())
+                    .body(e.to_string().into_bytes())
                     .unwrap(),
             }
         })

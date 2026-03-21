@@ -1,125 +1,7 @@
 use anyhow::{Context, bail};
-use std::io::{BufRead, BufReader, Read, Write};
-use std::os::unix::net::UnixStream;
+use potato_transport::{SseEvent, http_request, stream_sse};
+use std::io::BufRead;
 use std::thread;
-
-fn http_request(
-    socket_path: &str,
-    method: &str,
-    path: &str,
-    body: Option<&[u8]>,
-) -> anyhow::Result<Vec<u8>> {
-    let mut stream = UnixStream::connect(socket_path)
-        .with_context(|| format!("failed to connect to {socket_path}"))?;
-
-    let mut request =
-        format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n");
-    if let Some(b) = body {
-        request.push_str(&format!(
-            "Content-Type: application/json\r\nContent-Length: {}\r\n",
-            b.len()
-        ));
-    }
-    request.push_str("\r\n");
-
-    stream.write_all(request.as_bytes())?;
-    if let Some(b) = body {
-        stream.write_all(b)?;
-    }
-
-    let mut response = Vec::new();
-    stream.read_to_end(&mut response)?;
-
-    if let Some(pos) = String::from_utf8_lossy(&response).find("\r\n\r\n") {
-        Ok(response[pos + 4..].to_vec())
-    } else {
-        Ok(response)
-    }
-}
-
-/// Streams SSE from a request. Reports call_id via started_tx when "started" event arrives.
-fn stream_sse(
-    socket_path: &str,
-    method: &str,
-    path: &str,
-    body: Option<&[u8]>,
-    started_tx: Option<std::sync::mpsc::Sender<String>>,
-) {
-    let mut stream = match UnixStream::connect(socket_path) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("failed to connect: {e}");
-            std::process::exit(1);
-        }
-    };
-
-    let mut request =
-        format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n");
-    if let Some(b) = body {
-        request.push_str(&format!(
-            "Content-Type: application/json\r\nContent-Length: {}\r\n",
-            b.len()
-        ));
-    }
-    request.push_str("\r\n");
-
-    stream.write_all(request.as_bytes()).unwrap();
-    if let Some(b) = body {
-        stream.write_all(b).unwrap();
-    }
-
-    let reader = BufReader::new(stream);
-    let mut past_headers = false;
-
-    for line in reader.lines() {
-        let line = match line {
-            Ok(l) => l,
-            Err(_) => break,
-        };
-
-        if !past_headers {
-            if line.is_empty() {
-                past_headers = true;
-            }
-            continue;
-        }
-
-        if let Some(data) = line.strip_prefix("data:") {
-            let data = data.trim();
-            if data.is_empty() {
-                continue;
-            }
-
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(data) {
-                let event = parsed
-                    .get("event")
-                    .and_then(|e| e.as_str())
-                    .unwrap_or("output");
-
-                match event {
-                    "started" => {
-                        if let Some(ref tx) = started_tx {
-                            let call_id =
-                                parsed["data"]["call_id"].as_str().unwrap_or("").to_string();
-                            let _ = tx.send(call_id);
-                        }
-                    }
-                    "end" => break,
-                    "error" => {
-                        if let Some(d) = parsed.get("data") {
-                            eprintln!("{}", format_data(d));
-                        }
-                    }
-                    _ => {
-                        if let Some(d) = parsed.get("data") {
-                            println!("{}", format_data(d));
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 fn format_data(data: &serde_json::Value) -> String {
     match data {
@@ -174,7 +56,14 @@ fn main() -> anyhow::Result<()> {
             "POST",
             "/calls",
             Some(&body_bytes),
-            Some(started_tx),
+            |event| match event {
+                SseEvent::Started { call_id } => {
+                    let _ = started_tx.send(call_id);
+                }
+                SseEvent::Output(data) => println!("{}", format_data(&data)),
+                SseEvent::Error(data) => eprintln!("{}", format_data(&data)),
+                SseEvent::End => {}
+            },
         );
     });
 
