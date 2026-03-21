@@ -15,7 +15,7 @@ async fn create_call(
 ) -> Result<(), String> {
     state
         .0
-        .stream_sse_raw("POST", "/calls", Some(body.as_bytes()), |data| {
+        .stream_raw("POST", "/calls", Some(body.as_bytes()), |data| {
             let _ = on_event.send(data.to_string());
         })
         .await;

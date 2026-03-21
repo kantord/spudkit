@@ -68,7 +68,7 @@ impl PotatoConnection {
 
     /// Stream raw SSE data lines. Calls `on_line` for each `data:` line
     /// (with prefix stripped). Sends `{"event":"end"}` when the stream closes.
-    pub async fn stream_sse_raw(
+    pub async fn stream_raw(
         &self,
         method: &str,
         path: &str,
@@ -102,14 +102,14 @@ impl PotatoConnection {
     }
 
     /// Stream SSE events. Calls `on_event` for each parsed event.
-    pub async fn stream_sse(
+    pub async fn stream(
         &self,
         method: &str,
         path: &str,
         body: Option<&[u8]>,
         mut on_event: impl FnMut(SseEvent),
     ) {
-        self.stream_sse_raw(method, path, body, |data| {
+        self.stream_raw(method, path, body, |data| {
             if let Some(event) = parse_sse_line(data) {
                 on_event(event);
             }

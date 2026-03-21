@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
     let (started_tx, started_rx) = std::sync::mpsc::channel::<String>();
 
     let output_handle = tokio::spawn(async move {
-        app.stream_sse("POST", "/calls", Some(&body_bytes), |event| match event {
+        app.stream("POST", "/calls", Some(&body_bytes), |event| match event {
             SseEvent::Started { call_id } => {
                 let _ = started_tx.send(call_id);
             }
