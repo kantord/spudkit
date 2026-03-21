@@ -4,8 +4,15 @@ use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
 use tauri::Manager;
 
-fn forward_to_socket(method: &str, path: &str, body: Option<&[u8]>) -> Result<Vec<u8>, String> {
-    let mut stream = UnixStream::connect("/tmp/potato.sock")
+const APPS: &[&str] = &["potato-hello-world", "potato-hello-simple"];
+
+fn forward_to_socket(
+    socket_path: &str,
+    method: &str,
+    path: &str,
+    body: Option<&[u8]>,
+) -> Result<Vec<u8>, String> {
+    let mut stream = UnixStream::connect(socket_path)
         .map_err(|e| format!("failed to connect to socket: {e}"))?;
 
     let mut request = format!(
@@ -19,15 +26,18 @@ fn forward_to_socket(method: &str, path: &str, body: Option<&[u8]>) -> Result<Ve
     }
     request.push_str("\r\n");
 
-    stream.write_all(request.as_bytes())
+    stream
+        .write_all(request.as_bytes())
         .map_err(|e| format!("failed to write: {e}"))?;
     if let Some(b) = body {
-        stream.write_all(b)
+        stream
+            .write_all(b)
             .map_err(|e| format!("failed to write body: {e}"))?;
     }
 
     let mut response = Vec::new();
-    stream.read_to_end(&mut response)
+    stream
+        .read_to_end(&mut response)
         .map_err(|e| format!("failed to read: {e}"))?;
 
     if let Some(pos) = String::from_utf8_lossy(&response).find("\r\n\r\n") {
@@ -58,8 +68,22 @@ fn mime_for_path(path: &str) -> &'static str {
 }
 
 fn main() {
+    let app_name = std::env::args().nth(1).unwrap_or_else(|| {
+        eprintln!("Usage: potato-client <app-name>");
+        eprintln!("Available apps: {}", APPS.join(", "));
+        std::process::exit(1);
+    });
+
+    if !APPS.contains(&app_name.as_str()) {
+        eprintln!("Unknown app: {app_name}");
+        eprintln!("Available apps: {}", APPS.join(", "));
+        std::process::exit(1);
+    }
+
+    let socket_path = format!("/tmp/potato-{app_name}.sock");
+
     tauri::Builder::default()
-        .register_uri_scheme_protocol("potato", |_ctx, request| {
+        .register_uri_scheme_protocol("potato", move |_ctx, request| {
             let method = request.method().as_str().to_string();
             let mut path = request.uri().path().to_string();
 
@@ -70,7 +94,6 @@ fn main() {
                 None
             };
 
-            // Route: /run goes directly, everything else is a file
             let server_path = if path.starts_with("/run") {
                 path.clone()
             } else {
@@ -80,7 +103,7 @@ fn main() {
                 format!("/files{path}")
             };
 
-            match forward_to_socket(&method, &server_path, body.as_deref()) {
+            match forward_to_socket(&socket_path, &method, &server_path, body.as_deref()) {
                 Ok(response_body) => {
                     let mime = if path.starts_with("/run") {
                         "text/event-stream"

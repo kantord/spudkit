@@ -14,7 +14,7 @@ use tower_http::services::ServeDir;
 
 #[derive(Clone)]
 struct AppState {
-    container_id: String,
+    container_id: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -53,6 +53,15 @@ async fn run_command(
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(32);
 
     tokio::spawn(async move {
+        let container_id = match &state.container_id {
+            Some(id) => id.clone(),
+            None => {
+                let msg = tag_line("no container available for this app", "error");
+                let _ = tx.send(Ok(Event::default().data(msg))).await;
+                return;
+            }
+        };
+
         let docker = match Docker::connect_with_local_defaults() {
             Ok(d) => d,
             Err(e) => {
@@ -64,7 +73,7 @@ async fn run_command(
 
         let exec = match docker
             .create_exec(
-                &state.container_id,
+                &container_id,
                 CreateExecOptions {
                     cmd: Some(body.cmd),
                     attach_stdout: Some(true),
@@ -204,7 +213,7 @@ fn uuid() -> String {
     format!("{n:x}")
 }
 
-pub fn app(static_dir: PathBuf, container_id: String) -> Router {
+pub fn app(static_dir: PathBuf, container_id: Option<String>) -> Router {
     let state = AppState { container_id };
     Router::new()
         .route("/run", post(run_command))

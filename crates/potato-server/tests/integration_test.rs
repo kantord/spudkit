@@ -9,7 +9,7 @@ async fn test_app() -> axum::Router {
     let container_id = potato_server::start_container("debian:bookworm-slim")
         .await
         .expect("failed to start container");
-    potato_server::app(dir, container_id)
+    potato_server::app(dir, Some(container_id))
 }
 
 fn parse_sse_events(body: &str) -> Vec<serde_json::Value> {
