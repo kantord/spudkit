@@ -2654,6 +2654,7 @@ name = "potato-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "potato-client",
  "serde",
  "serde_json",

@@ -1,6 +1,17 @@
-use anyhow::bail;
+use clap::Parser;
 use potato_client::{PotatoClient, SseEvent};
 use std::io::BufRead;
+
+/// Run containerized apps from the command line
+#[derive(Parser)]
+#[command(name = "potato", version, about)]
+struct Args {
+    /// Docker image name of the app
+    app: String,
+
+    /// Command to run inside the container
+    command: Vec<String>,
+}
 
 fn format_data(data: &serde_json::Value) -> String {
     match data {
@@ -11,27 +22,22 @@ fn format_data(data: &serde_json::Value) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-
-    if args.len() < 3 {
-        bail!(
-            "Usage: potato <app-name> <command> [args...]\nExample: potato potato-hello-simple /echo.sh"
-        );
-    }
-
-    let app_name = &args[1];
-    let cmd: Vec<String> = args[2..].to_vec();
+    let args = Args::parse();
 
     let client = PotatoClient::new();
-    let app = client.app(app_name).await?;
+    let app = client.app(&args.app).await?;
     let app_for_stdin = app.clone();
 
-    let (started_tx, started_rx) = std::sync::mpsc::channel::<String>();
+    let (started_tx, started_rx) = tokio::sync::oneshot::channel::<String>();
 
+    let cmd = args.command;
     let output_handle = tokio::spawn(async move {
+        let mut started_tx = Some(started_tx);
         app.call(&cmd, |event| match event {
             SseEvent::Started { call_id } => {
-                let _ = started_tx.send(call_id);
+                if let Some(tx) = started_tx.take() {
+                    let _ = tx.send(call_id);
+                }
             }
             SseEvent::Output(data) => println!("{}", format_data(&data)),
             SseEvent::Error(data) => eprintln!("{}", format_data(&data)),
@@ -40,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
         .await;
     });
 
-    let call_id = match started_rx.recv() {
+    let call_id = match started_rx.await {
         Ok(id) => id,
         Err(_) => {
             let _ = output_handle.await;
@@ -48,18 +54,34 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let stdin_handle = tokio::task::spawn_blocking(move || {
-        let stdin = std::io::stdin();
-        let lines: Vec<String> = stdin.lock().lines().map_while(Result::ok).collect();
-        lines
+    // Forward stdin line by line concurrently with output
+    let stdin_handle = tokio::spawn(async move {
+        let (line_tx, mut line_rx) = tokio::sync::mpsc::channel::<String>(32);
+
+        // Read stdin in a blocking thread
+        std::thread::spawn(move || {
+            let stdin = std::io::stdin();
+            for line in stdin.lock().lines() {
+                match line {
+                    Ok(l) => {
+                        if line_tx.blocking_send(l).is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+
+        // Send each line as it arrives
+        while let Some(line) = line_rx.recv().await {
+            let data = serde_json::json!({ "text": line });
+            let _ = app_for_stdin.send_stdin(&call_id, &data).await;
+        }
     });
 
-    let lines = stdin_handle.await?;
-    for line in lines {
-        let data = serde_json::json!({ "text": line });
-        let _ = app_for_stdin.send_stdin(&call_id, &data).await;
-    }
-
+    // Wait for output to finish (process exit closes the stream)
     let _ = output_handle.await;
+    stdin_handle.abort();
     Ok(())
 }
