@@ -5,7 +5,7 @@ use axum::{
 };
 
 use crate::app_manager::{AppManager, RunningApp};
-use crate::container;
+use crate::container::{AppContainer, extract_image};
 
 #[derive(serde::Deserialize)]
 struct ActivateRequest {
@@ -22,7 +22,7 @@ async fn activate_handler(
         return Json(serde_json::json!({"ok": true, "status": "already_active"}));
     }
 
-    let static_dir = match container::extract_image(image).await {
+    let static_dir = match extract_image(image).await {
         Ok(dir) => dir,
         Err(e) => {
             return Json(
@@ -31,7 +31,8 @@ async fn activate_handler(
         }
     };
 
-    let container_id = container::start_container(image).await.ok();
+    let container = AppContainer::start(image).await.ok();
+    let container_id = container.as_ref().map(|c| c.id.clone());
 
     let path = format!("/tmp/potato-{image}.sock");
     let _ = std::fs::remove_file(&path);
@@ -45,13 +46,13 @@ async fn activate_handler(
         }
     };
 
-    let router = crate::app(static_dir, container_id.clone());
+    let router = crate::app(static_dir, container_id);
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });
 
     manager
-        .insert(image.to_string(), RunningApp { container_id })
+        .insert(image.to_string(), RunningApp { container })
         .await;
 
     Json(serde_json::json!({"ok": true, "status": "activated"}))

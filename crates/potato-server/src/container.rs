@@ -4,45 +4,55 @@ use bollard::query_parameters::{CreateContainerOptions, RemoveContainerOptions};
 use futures_util::StreamExt;
 use std::path::PathBuf;
 
-pub async fn start_container(image: &str) -> anyhow::Result<String> {
-    let docker = Docker::connect_with_local_defaults()?;
-
-    let config = ContainerCreateBody {
-        image: Some(image.to_string()),
-        cmd: Some(vec!["sleep".to_string(), "infinity".to_string()]),
-        ..Default::default()
-    };
-
-    let name = format!("potato-{}", crate::uuid());
-    let container = docker
-        .create_container(
-            Some(CreateContainerOptions {
-                name: Some(name),
-                ..Default::default()
-            }),
-            config,
-        )
-        .await?;
-
-    docker.start_container(&container.id, None).await?;
-
-    Ok(container.id)
+/// A running app container.
+pub struct AppContainer {
+    pub id: String,
 }
 
-pub async fn stop_container(container_id: &str) {
-    if let Ok(docker) = Docker::connect_with_local_defaults() {
-        let _ = docker
-            .remove_container(
-                container_id,
-                Some(RemoveContainerOptions {
-                    force: true,
+impl AppContainer {
+    /// Start a persistent container for an app image.
+    pub async fn start(image: &str) -> anyhow::Result<Self> {
+        let docker = Docker::connect_with_local_defaults()?;
+
+        let config = ContainerCreateBody {
+            image: Some(image.to_string()),
+            cmd: Some(vec!["sleep".to_string(), "infinity".to_string()]),
+            ..Default::default()
+        };
+
+        let name = format!("potato-{}", crate::uuid());
+        let container = docker
+            .create_container(
+                Some(CreateContainerOptions {
+                    name: Some(name),
                     ..Default::default()
                 }),
+                config,
             )
-            .await;
+            .await?;
+
+        docker.start_container(&container.id, None).await?;
+
+        Ok(Self { id: container.id })
+    }
+
+    /// Stop and remove the container.
+    pub async fn stop(&self) {
+        if let Ok(docker) = Docker::connect_with_local_defaults() {
+            let _ = docker
+                .remove_container(
+                    &self.id,
+                    Some(RemoveContainerOptions {
+                        force: true,
+                        ..Default::default()
+                    }),
+                )
+                .await;
+        }
     }
 }
 
+/// Extract an image's filesystem to a temp directory.
 pub async fn extract_image(image: &str) -> anyhow::Result<PathBuf> {
     let docker = Docker::connect_with_local_defaults()?;
 

@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::container;
+use crate::container::AppContainer;
 
 pub struct RunningApp {
-    pub container_id: Option<String>,
+    pub container: Option<AppContainer>,
 }
 
 /// Manages the set of active apps and their containers.
@@ -37,9 +37,9 @@ impl AppManager {
     pub async fn shutdown(&self) {
         let apps = self.apps.lock().await;
         for (name, app) in apps.iter() {
-            if let Some(id) = &app.container_id {
+            if let Some(container) = &app.container {
                 println!("[{name}] Stopping container...");
-                container::stop_container(id).await;
+                container.stop().await;
             }
             let path = format!("/tmp/potato-{name}.sock");
             let _ = std::fs::remove_file(&path);

@@ -8,10 +8,10 @@ use tower::ServiceExt;
 #[fixture]
 async fn app() -> axum::Router {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let container_id = potato_server::start_container("debian:bookworm-slim")
+    let container = potato_server::container::AppContainer::start("debian:bookworm-slim")
         .await
         .expect("failed to start container");
-    potato_server::app(dir, Some(container_id))
+    potato_server::app(dir, Some(container.id))
 }
 
 fn parse_sse_events(body: &str) -> Vec<serde_json::Value> {

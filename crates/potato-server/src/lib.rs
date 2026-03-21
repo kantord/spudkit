@@ -10,10 +10,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::services::ServeDir;
 
-pub use app_manager::{AppManager, RunningApp};
-
 pub use app_manager::start;
-pub use container::{extract_image, start_container, stop_container};
+pub use app_manager::{AppManager, RunningApp};
 
 pub fn app(static_dir: PathBuf, container_id: Option<String>) -> Router {
     let state = calls::AppState {
