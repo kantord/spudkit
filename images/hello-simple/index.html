@@ -74,6 +74,7 @@
     <div id="input-area">
         <input id="msg" type="text" placeholder="Type a message..." autofocus />
         <button id="send">Send</button>
+        <button id="bench">Benchmark</button>
     </div>
     <script>
         const messages = document.getElementById('messages');
@@ -137,7 +138,78 @@
             input.focus();
         }
 
+        async function benchmark() {
+            const benchBtn = document.getElementById('bench');
+            benchBtn.disabled = true;
+            const statusMsg = addMessage('Benchmarking...', 'bot');
+
+            const rounds = 20;
+            let totalFirstWord = 0;
+            let totalComplete = 0;
+            let totalWords = 0;
+
+            for (let r = 0; r < rounds; r++) {
+                const start = performance.now();
+                let firstWordTime = 0;
+                let wordCount = 0;
+
+                const res = await fetch('/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cmd: ['/bench.sh'], stdin: {} })
+                });
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data:')) continue;
+                        const json = line.slice(5).trim();
+                        if (!json) continue;
+                        try {
+                            const msg = JSON.parse(json);
+                            if (msg.event === 'output' && msg.data.word) {
+                                wordCount++;
+                                if (firstWordTime === 0) firstWordTime = performance.now() - start;
+                            }
+                        } catch {}
+                    }
+                }
+
+                const elapsed = performance.now() - start;
+                totalFirstWord += firstWordTime;
+                totalComplete += elapsed;
+                totalWords += wordCount;
+                statusMsg.textContent = `Benchmarking... ${r + 1}/${rounds}`;
+            }
+
+            const avgFirst = (totalFirstWord / rounds).toFixed(1);
+            const avgComplete = (totalComplete / rounds).toFixed(1);
+            const avgPerWord = (totalComplete / totalWords).toFixed(2);
+            const wordsPerSec = (totalWords / (totalComplete / 1000)).toFixed(0);
+
+            statusMsg.textContent = [
+                `${rounds} rounds, ${totalWords} words total`,
+                `Avg first word: ${avgFirst}ms`,
+                `Avg complete: ${avgComplete}ms`,
+                `Avg per word: ${avgPerWord}ms`,
+                `Throughput: ${wordsPerSec} words/s`
+            ].join(' | ');
+
+            benchBtn.disabled = false;
+        }
+
         sendBtn.addEventListener('click', send);
+        document.getElementById('bench').addEventListener('click', benchmark);
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') send();
         });
