@@ -155,8 +155,8 @@
                     if (!json) continue;
                     try {
                         const msg = JSON.parse(json);
-                        if (msg.event === 'output' && msg.data.word) {
-                            words.push(msg.data.word);
+                        if (msg.event === 'output' && msg.data) {
+                            words.push(msg.data);
                             botMsg.textContent = words.join(' ');
                             messages.scrollTop = messages.scrollHeight;
                         }
@@ -196,7 +196,7 @@
                         if (!json) continue;
                         try {
                             const msg = JSON.parse(json);
-                            if (msg.event === 'output' && msg.data.word) {
+                            if (msg.event === 'output' && msg.data) {
                                 wordCount++;
                                 if (firstWordTime === 0) firstWordTime = performance.now() - start;
                             }
@@ -262,8 +262,8 @@
                         if (!json) continue;
                         try {
                             const msg = JSON.parse(json);
-                            if (msg.event === 'output' && msg.data.echo) {
-                                addMessage(msg.data.echo, 'echo', echoLog);
+                            if (msg.event === 'output' && msg.data) {
+                                addMessage(msg.data, 'echo', echoLog);
                             }
                         } catch {}
                     }
