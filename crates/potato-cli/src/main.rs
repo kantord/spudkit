@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::thread;
 
@@ -149,91 +149,60 @@ fn main() {
 
     let socket_path = format!("/tmp/potato-{app_name}.sock");
 
-    let has_stdin = !std::io::stdin().is_terminal();
+    // Always use bidirectional mode — create call, connect events, forward stdin
+    let body = serde_json::json!({ "cmd": cmd });
+    let response = http_request(
+        &socket_path,
+        "POST",
+        "/calls",
+        Some(body.to_string().as_bytes()),
+    )
+    .unwrap_or_else(|e| {
+        eprintln!("failed to create call: {e}");
+        std::process::exit(1);
+    });
 
-    if has_stdin {
-        // Bidirectional mode: create a call, pipe stdin, stream output
-        let body = serde_json::json!({ "cmd": cmd });
-        let response = http_request(
-            &socket_path,
+    let call: serde_json::Value = serde_json::from_slice(&response).unwrap_or_else(|e| {
+        eprintln!("invalid response: {e}");
+        std::process::exit(1);
+    });
+
+    let call_id = call["call_id"].as_str().unwrap_or_else(|| {
+        eprintln!("no call_id in response");
+        std::process::exit(1);
+    });
+
+    let events_path = format!("/calls/{call_id}/events");
+    let stdin_path = format!("/calls/{call_id}/stdin");
+    let socket_events = socket_path.clone();
+    let socket_stdin = socket_path.clone();
+
+    // Connect to events first (starts the process)
+    let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
+    let output_handle = thread::spawn(move || {
+        stream_sse(&socket_events, "GET", &events_path, None, Some(ready_tx));
+    });
+
+    // Wait for events connection to be established
+    let _ = ready_rx.recv();
+
+    // Forward stdin to the call (works for both piped and interactive)
+    let stdin = std::io::stdin();
+    for line in stdin.lock().lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => break,
+        };
+
+        let body = serde_json::json!({ "data": { "text": line } });
+        let _ = http_request(
+            &socket_stdin,
             "POST",
-            "/calls",
+            &stdin_path,
             Some(body.to_string().as_bytes()),
-        )
-        .unwrap_or_else(|e| {
-            eprintln!("failed to create call: {e}");
-            std::process::exit(1);
-        });
-
-        let call: serde_json::Value = serde_json::from_slice(&response).unwrap_or_else(|e| {
-            eprintln!("invalid response: {e}");
-            std::process::exit(1);
-        });
-
-        let call_id = call["call_id"].as_str().unwrap_or_else(|| {
-            eprintln!("no call_id in response");
-            std::process::exit(1);
-        });
-
-        let events_path = format!("/calls/{call_id}/events");
-        let stdin_path = format!("/calls/{call_id}/stdin");
-        let socket_events = socket_path.clone();
-        let socket_stdin = socket_path.clone();
-        let stdin_path_clone = stdin_path.clone();
-
-        // Spawn output reader — must connect before we send stdin
-        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
-        let output_handle = thread::spawn(move || {
-            stream_sse(&socket_events, "GET", &events_path, None, Some(ready_tx));
-        });
-
-        // Wait for events connection to be established
-        let _ = ready_rx.recv();
-
-        // Read stdin and send to call
-        let stdin = std::io::stdin();
-        for line in stdin.lock().lines() {
-            let line = match line {
-                Ok(l) => l,
-                Err(_) => break,
-            };
-
-            let body = serde_json::json!({ "data": { "text": line } });
-            let _ = http_request(
-                &socket_stdin,
-                "POST",
-                &stdin_path_clone,
-                Some(body.to_string().as_bytes()),
-            );
-        }
-
-        // Wait for output to finish
-        let _ = output_handle.join();
-    } else {
-        // No stdin piped — one-shot mode via /calls (create, listen, process exits)
-        let body = serde_json::json!({ "cmd": cmd });
-        let response = http_request(
-            &socket_path,
-            "POST",
-            "/calls",
-            Some(body.to_string().as_bytes()),
-        )
-        .unwrap_or_else(|e| {
-            eprintln!("failed to create call: {e}");
-            std::process::exit(1);
-        });
-
-        let call: serde_json::Value = serde_json::from_slice(&response).unwrap_or_else(|e| {
-            eprintln!("invalid response: {e}");
-            std::process::exit(1);
-        });
-
-        let call_id = call["call_id"].as_str().unwrap_or_else(|| {
-            eprintln!("no call_id in response");
-            std::process::exit(1);
-        });
-
-        let events_path = format!("/calls/{call_id}/events");
-        stream_sse(&socket_path, "GET", &events_path, None, None);
+        );
     }
+
+    // Wait for output to finish
+    let _ = output_handle.join();
 }

@@ -15,8 +15,8 @@ tar = "=0.4.45"
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.149"
 tokio-stream = "=0.1.18"
-os_pipe = "=1.2.3"
 uuid = { version = "=1.22.0", features = ["v4"] }
+os_pipe = "1"
 
 [dev-dependencies]
 hyper = "=1.8.1"

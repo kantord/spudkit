@@ -258,14 +258,27 @@ pub async fn extract_image(image: &str) -> Result<PathBuf, Box<dyn std::error::E
 
     let unpack_handle = std::thread::spawn(move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut archive = tar::Archive::new(pipe_reader);
-        archive.unpack(&extract_dir_clone)?;
+        archive.set_preserve_permissions(false);
+        archive.set_unpack_xattrs(false);
+        for entry in archive.entries()? {
+            let mut entry = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            let kind = entry.header().entry_type();
+            if kind.is_file() || kind.is_dir() || kind.is_symlink() || kind.is_hard_link() {
+                let _ = entry.unpack_in(&extract_dir_clone);
+            }
+        }
         Ok(())
     });
 
     let mut tar_stream = docker.export_container(&container.id);
     while let Some(chunk) = tar_stream.next().await {
         let chunk = chunk?;
-        std::io::Write::write_all(&mut pipe_writer, &chunk)?;
+        if std::io::Write::write_all(&mut pipe_writer, &chunk).is_err() {
+            break;
+        }
     }
     drop(pipe_writer);
 
