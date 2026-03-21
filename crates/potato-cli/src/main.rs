@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, IsTerminal, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::thread;
 
@@ -129,7 +129,7 @@ fn main() {
     let cmd: Vec<String> = args[2..].to_vec();
     let socket_path = format!("/tmp/potato-{app_name}.sock");
 
-    let has_stdin = !atty::is(atty::Stream::Stdin);
+    let has_stdin = !std::io::stdin().is_terminal();
 
     if has_stdin {
         // Bidirectional mode: create a call, pipe stdin, stream output
