@@ -15,5 +15,5 @@ async fn main() {
     tokio::signal::ctrl_c().await.unwrap();
 
     println!("Shutting down...");
-    potato_server::shutdown(&registry).await;
+    registry.shutdown().await;
 }
