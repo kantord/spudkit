@@ -112,7 +112,6 @@
             if (name === 'echo' && !echoCallId) startEcho();
         }
 
-        // --- Chat (existing, uses /run) ---
         const messages = document.getElementById('messages');
         const chatInput = document.getElementById('msg');
         const sendBtn = document.getElementById('send');
@@ -127,19 +126,23 @@
             return div;
         }
 
-        async function send() {
-            const text = chatInput.value.trim();
-            if (!text) return;
-            addMessage(text, 'user');
-            chatInput.value = '';
-            sendBtn.disabled = true;
-            const botMsg = addMessage('', 'bot');
-            let words = [];
-            const res = await fetch('/run', {
+        async function streamCall(cmd, stdin, onEvent) {
+            const createRes = await fetch('/calls', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cmd: ['/chat.sh'], stdin: { message: text } })
+                body: JSON.stringify({ cmd: cmd })
             });
+            const { call_id } = await createRes.json();
+
+            if (stdin !== undefined) {
+                await fetch('/calls/' + call_id + '/stdin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: stdin })
+                });
+            }
+
+            const res = await fetch('/calls/' + call_id + '/events');
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
@@ -155,14 +158,27 @@
                     if (!json) continue;
                     try {
                         const msg = JSON.parse(json);
-                        if (msg.event === 'output' && msg.data) {
-                            words.push(msg.data);
-                            botMsg.textContent = words.join(' ');
-                            messages.scrollTop = messages.scrollHeight;
-                        }
+                        onEvent(msg.event || 'output', msg.data);
                     } catch {}
                 }
             }
+        }
+
+        async function send() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            addMessage(text, 'user');
+            chatInput.value = '';
+            sendBtn.disabled = true;
+            const botMsg = addMessage('', 'bot');
+            let words = [];
+            await streamCall(['/chat.sh'], { message: text }, function(event, data) {
+                if (event === 'output' && data) {
+                    words.push(data);
+                    botMsg.textContent = words.join(' ');
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            });
             sendBtn.disabled = false;
             chatInput.focus();
         }
@@ -176,33 +192,12 @@
             for (let r = 0; r < rounds; r++) {
                 const start = performance.now();
                 let firstWordTime = 0, wordCount = 0;
-                const res = await fetch('/run', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cmd: ['/bench.sh'], stdin: {} })
-                });
-                const reader = res.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-                    for (const line of lines) {
-                        if (!line.startsWith('data:')) continue;
-                        const json = line.slice(5).trim();
-                        if (!json) continue;
-                        try {
-                            const msg = JSON.parse(json);
-                            if (msg.event === 'output' && msg.data) {
-                                wordCount++;
-                                if (firstWordTime === 0) firstWordTime = performance.now() - start;
-                            }
-                        } catch {}
+                await streamCall(['/bench.sh'], {}, function(event, data) {
+                    if (event === 'output' && data) {
+                        wordCount++;
+                        if (firstWordTime === 0) firstWordTime = performance.now() - start;
                     }
-                }
+                });
                 totalFirstWord += firstWordTime;
                 totalComplete += performance.now() - start;
                 totalWords += wordCount;

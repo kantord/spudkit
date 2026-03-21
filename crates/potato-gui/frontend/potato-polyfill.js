@@ -8,11 +8,6 @@
     var url = typeof input === "string" ? input : input.url;
     var method = (init && init.method) || "GET";
 
-    // Intercept POST /run — stream via Channel
-    if (url === "/run" && method === "POST") {
-      return streamViaChannel("stream_run", { body: init.body || "{}" });
-    }
-
     // Intercept POST /calls — create call, return JSON response
     if (url === "/calls" && method === "POST") {
       return invoke("create_call", { body: init.body || "{}" }).then(function (

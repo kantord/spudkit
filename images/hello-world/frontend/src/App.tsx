@@ -7,12 +7,23 @@ async function runCommand(
   stdin: unknown,
   onEvent: (event: string, data: unknown) => void
 ): Promise<void> {
-  const res = await fetch("/run", {
+  // Create a call
+  const createRes = await fetch("/calls", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cmd, stdin }),
+    body: JSON.stringify({ cmd }),
+  });
+  const { call_id } = await createRes.json();
+
+  // Send stdin
+  await fetch(`/calls/${call_id}/stdin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: stdin }),
   });
 
+  // Stream events
+  const res = await fetch(`/calls/${call_id}/events`);
   const reader = res.body?.getReader();
   if (!reader) return;
 

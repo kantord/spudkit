@@ -37,7 +37,7 @@ fn http_request(
     }
 }
 
-fn stream_sse(socket_path: &str, method: &str, path: &str, body: Option<&[u8]>) {
+fn stream_sse(socket_path: &str, method: &str, path: &str, body: Option<&[u8]>, ready: Option<std::sync::mpsc::Sender<()>>) {
     let mut stream = match UnixStream::connect(socket_path) {
         Ok(s) => s,
         Err(e) => {
@@ -74,6 +74,9 @@ fn stream_sse(socket_path: &str, method: &str, path: &str, body: Option<&[u8]>) 
         if !past_headers {
             if line.is_empty() {
                 past_headers = true;
+                if let Some(ref r) = ready {
+                    let _ = r.send(());
+                }
             }
             continue;
         }
@@ -158,10 +161,14 @@ fn main() {
         let socket_stdin = socket_path.clone();
         let stdin_path_clone = stdin_path.clone();
 
-        // Spawn output reader
+        // Spawn output reader — must connect before we send stdin
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
         let output_handle = thread::spawn(move || {
-            stream_sse(&socket_events, "GET", &events_path, None);
+            stream_sse(&socket_events, "GET", &events_path, None, Some(ready_tx));
         });
+
+        // Wait for events connection to be established
+        let _ = ready_rx.recv();
 
         // Read stdin and send to call
         let stdin = std::io::stdin();
@@ -183,13 +190,30 @@ fn main() {
         // Wait for output to finish
         let _ = output_handle.join();
     } else {
-        // No stdin piped — one-shot mode using /run
+        // No stdin piped — one-shot mode via /calls (create, listen, process exits)
         let body = serde_json::json!({ "cmd": cmd });
-        stream_sse(
+        let response = http_request(
             &socket_path,
             "POST",
-            "/run",
+            "/calls",
             Some(body.to_string().as_bytes()),
-        );
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("failed to create call: {e}");
+            std::process::exit(1);
+        });
+
+        let call: serde_json::Value = serde_json::from_slice(&response).unwrap_or_else(|e| {
+            eprintln!("invalid response: {e}");
+            std::process::exit(1);
+        });
+
+        let call_id = call["call_id"].as_str().unwrap_or_else(|| {
+            eprintln!("no call_id in response");
+            std::process::exit(1);
+        });
+
+        let events_path = format!("/calls/{call_id}/events");
+        stream_sse(&socket_path, "GET", &events_path, None, None);
     }
 }
