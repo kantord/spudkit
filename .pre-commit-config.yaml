@@ -15,7 +15,7 @@ repos:
       - id: cargo-clippy
         name: cargo clippy
         language: system
-        entry: cargo clippy -- -D warnings
+        entry: cargo clippy -- -D warnings -D dead_code
         files: '\.rs$'
         pass_filenames: false
       - id: cargo-test
