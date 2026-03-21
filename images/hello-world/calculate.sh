@@ -1,7 +1,7 @@
 #!/bin/sh
 read input
-a=$(echo "$input" | sed 's/.*"a":\([0-9.]*\).*/\1/')
-b=$(echo "$input" | sed 's/.*"b":\([0-9.]*\).*/\1/')
+a=$(echo "$input" | sed 's/.*"a":\(-\?[0-9.]*\).*/\1/')
+b=$(echo "$input" | sed 's/.*"b":\(-\?[0-9.]*\).*/\1/')
 op=$(echo "$input" | sed 's/.*"op":"\([^"]*\)".*/\1/')
 
 if [ "$op" = "add" ]; then
