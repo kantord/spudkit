@@ -5,12 +5,81 @@ use hyper::{Method, Request};
 use hyper_util::client::legacy::Client;
 use hyperlocal::{UnixClientExt, UnixConnector, Uri};
 
-/// A parsed SSE event with its event type and data.
+/// A tagged event in the potato protocol.
+/// Used on both the server side (creating events from container output)
+/// and the client side (parsing events from SSE streams).
 pub enum SseEvent {
-    Started { call_id: String },
+    Started {
+        call_id: String,
+    },
     Output(serde_json::Value),
     Error(serde_json::Value),
+    Custom {
+        event: String,
+        data: serde_json::Value,
+    },
     End,
+}
+
+impl SseEvent {
+    /// Create an event from a raw stdout line.
+    /// If the line is already tagged JSON (has an "event" field), it is parsed as-is.
+    /// Otherwise, it is wrapped as an Output event.
+    pub fn from_stdout(line: &str) -> Self {
+        Self::from_line(line, "output")
+    }
+
+    /// Create an event from a raw stderr line.
+    /// If the line is already tagged JSON (has an "event" field), it is parsed as-is.
+    /// Otherwise, it is wrapped as an Error event.
+    pub fn from_stderr(line: &str) -> Self {
+        Self::from_line(line, "error")
+    }
+
+    fn from_line(line: &str, default_event: &str) -> Self {
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(line) {
+            if let Some(event) = parsed.get("event").and_then(|e| e.as_str()) {
+                let data = parsed.get("data").cloned().unwrap_or(parsed.clone());
+                return match event {
+                    "started" => {
+                        let call_id = parsed["data"]["call_id"].as_str().unwrap_or("").to_string();
+                        Self::Started { call_id }
+                    }
+                    "end" => Self::End,
+                    "error" => Self::Error(data),
+                    "output" => Self::Output(data),
+                    _ => Self::Custom {
+                        event: event.to_string(),
+                        data,
+                    },
+                };
+            }
+            if default_event == "error" {
+                return Self::Error(parsed);
+            }
+            return Self::Output(parsed);
+        }
+        let text = serde_json::Value::String(line.to_string());
+        if default_event == "error" {
+            Self::Error(text)
+        } else {
+            Self::Output(text)
+        }
+    }
+
+    /// Serialize the event to a JSON string suitable for SSE data.
+    pub fn to_json(&self) -> String {
+        let value = match self {
+            Self::Started { call_id } => {
+                serde_json::json!({"event": "started", "data": {"call_id": call_id}})
+            }
+            Self::Output(data) => serde_json::json!({"event": "output", "data": data}),
+            Self::Error(data) => serde_json::json!({"event": "error", "data": data}),
+            Self::Custom { event, data } => serde_json::json!({"event": event, "data": data}),
+            Self::End => serde_json::json!({"event": "end"}),
+        };
+        value.to_string()
+    }
 }
 
 /// A connection to a Unix socket endpoint.
@@ -119,21 +188,7 @@ impl PotatoConnection {
 }
 
 fn parse_sse_line(data: &str) -> Option<SseEvent> {
-    let parsed: serde_json::Value = serde_json::from_str(data).ok()?;
-    let event = parsed
-        .get("event")
-        .and_then(|e| e.as_str())
-        .unwrap_or("output");
-
-    match event {
-        "started" => {
-            let call_id = parsed["data"]["call_id"].as_str().unwrap_or("").to_string();
-            Some(SseEvent::Started { call_id })
-        }
-        "end" => Some(SseEvent::End),
-        "error" => parsed.get("data").map(|d| SseEvent::Error(d.clone())),
-        _ => parsed.get("data").map(|d| SseEvent::Output(d.clone())),
-    }
+    Some(SseEvent::from_stdout(data))
 }
 
 fn process_buffer(buffer: &mut String, on_line: &mut impl FnMut(&str)) {

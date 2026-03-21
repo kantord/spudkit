@@ -2694,6 +2694,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "os_pipe",
+ "potato-transport",
  "rstest",
  "serde",
  "serde_json",

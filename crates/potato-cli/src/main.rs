@@ -28,25 +28,27 @@ async fn main() -> anyhow::Result<()> {
     let app = client.app(&args.app).await?;
     let app_for_stdin = app.clone();
 
-    let (started_tx, started_rx) = tokio::sync::oneshot::channel::<String>();
+    let (call_id_tx, call_id_rx) = tokio::sync::oneshot::channel::<String>();
 
     let cmd = args.command;
     let output_handle = tokio::spawn(async move {
-        let mut started_tx = Some(started_tx);
+        let mut call_id_tx = Some(call_id_tx);
         app.call(&cmd, |event| match event {
             SseEvent::Started { call_id } => {
-                if let Some(tx) = started_tx.take() {
+                if let Some(tx) = call_id_tx.take() {
                     let _ = tx.send(call_id);
                 }
             }
-            SseEvent::Output(data) => println!("{}", format_data(&data)),
+            SseEvent::Output(data) | SseEvent::Custom { data, .. } => {
+                println!("{}", format_data(&data))
+            }
             SseEvent::Error(data) => eprintln!("{}", format_data(&data)),
             SseEvent::End => {}
         })
         .await;
     });
 
-    let call_id = match started_rx.await {
+    let call_id = match call_id_rx.await {
         Ok(id) => id,
         Err(_) => {
             let _ = output_handle.await;

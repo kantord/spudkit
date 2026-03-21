@@ -38,24 +38,7 @@ struct StdinRequest {
     data: serde_json::Value,
 }
 
-fn tag_line(line: &str, default_event: &str) -> String {
-    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(line) {
-        if parsed.get("event").is_some() {
-            return serde_json::to_string(&parsed).unwrap_or_else(|_| line.to_string());
-        }
-        let tagged = serde_json::json!({
-            "event": default_event,
-            "data": parsed,
-        });
-        serde_json::to_string(&tagged).unwrap()
-    } else {
-        let tagged = serde_json::json!({
-            "event": default_event,
-            "data": line,
-        });
-        serde_json::to_string(&tagged).unwrap()
-    }
-}
+use potato_transport::SseEvent;
 
 // POST /calls — create call, start the process, and stream output as SSE
 // First event is {"event":"started","data":{"call_id":"..."}} so client can send stdin
@@ -74,7 +57,8 @@ async fn create_call(
         let container_id = match container_id {
             Some(id) => id,
             None => {
-                let msg = tag_line("no container available for this app", "error");
+                let msg = SseEvent::Error(serde_json::json!("no container available for this app"))
+                    .to_json();
                 let _ = tx.send(Ok(Event::default().data(msg))).await;
                 return;
             }
@@ -83,7 +67,10 @@ async fn create_call(
         let docker = match Docker::connect_with_local_defaults() {
             Ok(d) => d,
             Err(e) => {
-                let msg = tag_line(&format!("failed to connect to docker: {e}"), "error");
+                let msg = SseEvent::Error(serde_json::json!(format!(
+                    "failed to connect to docker: {e}"
+                )))
+                .to_json();
                 let _ = tx.send(Ok(Event::default().data(msg))).await;
                 return;
             }
@@ -104,7 +91,8 @@ async fn create_call(
         {
             Ok(e) => e,
             Err(e) => {
-                let msg = tag_line(&format!("failed to create exec: {e}"), "error");
+                let msg = SseEvent::Error(serde_json::json!(format!("failed to create exec: {e}")))
+                    .to_json();
                 let _ = tx.send(Ok(Event::default().data(msg))).await;
                 return;
             }
@@ -115,19 +103,22 @@ async fn create_call(
                 let stdin_writer: StdinWriter = Arc::new(Mutex::new(Some(Box::new(input))));
                 stdin_writers.lock().await.insert(cid.clone(), stdin_writer);
 
-                // Send started event with call_id so client can send stdin
-                let started = serde_json::json!({"event":"started","data":{"call_id": cid}});
                 let _ = tx
-                    .send(Ok(Event::default().data(started.to_string())))
+                    .send(Ok(Event::default().data(
+                        SseEvent::Started {
+                            call_id: cid.clone(),
+                        }
+                        .to_json(),
+                    )))
                     .await;
 
                 while let Some(Ok(log)) = output.next().await {
-                    let (text, default_event) = match &log {
+                    let (text, is_stderr) = match &log {
                         LogOutput::StdOut { message } => {
-                            (String::from_utf8_lossy(message).to_string(), "output")
+                            (String::from_utf8_lossy(message).to_string(), false)
                         }
                         LogOutput::StdErr { message } => {
-                            (String::from_utf8_lossy(message).to_string(), "error")
+                            (String::from_utf8_lossy(message).to_string(), true)
                         }
                         _ => continue,
                     };
@@ -136,20 +127,30 @@ async fn create_call(
                         if line.is_empty() {
                             continue;
                         }
-                        let tagged = tag_line(line, default_event);
-                        if tx.send(Ok(Event::default().data(tagged))).await.is_err() {
+                        let event = if is_stderr {
+                            SseEvent::from_stderr(line)
+                        } else {
+                            SseEvent::from_stdout(line)
+                        };
+                        if tx
+                            .send(Ok(Event::default().data(event.to_json())))
+                            .await
+                            .is_err()
+                        {
                             break;
                         }
                     }
                 }
 
-                let end_msg = serde_json::json!({"event":"end"}).to_string();
-                let _ = tx.send(Ok(Event::default().data(end_msg))).await;
+                let _ = tx
+                    .send(Ok(Event::default().data(SseEvent::End.to_json())))
+                    .await;
                 stdin_writers.lock().await.remove(&cid);
             }
             Ok(StartExecResults::Detached) => {}
             Err(e) => {
-                let msg = tag_line(&format!("failed to start exec: {e}"), "error");
+                let msg = SseEvent::Error(serde_json::json!(format!("failed to start exec: {e}")))
+                    .to_json();
                 let _ = tx.send(Ok(Event::default().data(msg))).await;
             }
         }
@@ -363,6 +364,35 @@ async fn list_apps_handler(State(registry): State<AppRegistry>) -> Json<serde_js
     let apps = registry.lock().await;
     let names: Vec<&String> = apps.keys().collect();
     Json(serde_json::json!({"apps": names}))
+}
+
+/// Start the management socket and return the registry for shutdown.
+pub async fn start(mgmt_path: &str) -> AppRegistry {
+    let registry: AppRegistry = Arc::new(Mutex::new(HashMap::new()));
+
+    let _ = std::fs::remove_file(mgmt_path);
+    let listener = tokio::net::UnixListener::bind(mgmt_path).unwrap();
+    println!("Potato server listening on {mgmt_path}");
+
+    let mgmt_app = management_app(registry.clone());
+    tokio::spawn(async move {
+        axum::serve(listener, mgmt_app).await.unwrap();
+    });
+
+    registry
+}
+
+/// Stop all running containers and remove app sockets.
+pub async fn shutdown(registry: &AppRegistry) {
+    let apps = registry.lock().await;
+    for (name, app) in apps.iter() {
+        if let Some(id) = &app.container_id {
+            println!("[{name}] Stopping container...");
+            stop_container(id).await;
+        }
+        let path = format!("/tmp/potato-{name}.sock");
+        let _ = std::fs::remove_file(&path);
+    }
 }
 
 pub fn management_app(registry: AppRegistry) -> Router<()> {

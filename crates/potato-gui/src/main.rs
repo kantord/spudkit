@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use potato_client::{PotatoApp, PotatoClient, SseEvent};
+use potato_client::{PotatoApp, PotatoClient};
 use tauri::Manager;
 use tauri::ipc::Channel;
 use tauri::webview::WebviewWindowBuilder;
@@ -27,15 +27,7 @@ async fn create_call(
     state
         .0
         .call(&cmd, |event| {
-            let json = match &event {
-                SseEvent::Started { call_id } => {
-                    serde_json::json!({"event": "started", "data": {"call_id": call_id}})
-                }
-                SseEvent::Output(data) => serde_json::json!({"event": "output", "data": data}),
-                SseEvent::Error(data) => serde_json::json!({"event": "error", "data": data}),
-                SseEvent::End => serde_json::json!({"event": "end"}),
-            };
-            let _ = on_event.send(json.to_string());
+            let _ = on_event.send(event.to_json());
         })
         .await;
 
