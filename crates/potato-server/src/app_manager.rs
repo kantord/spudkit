@@ -55,7 +55,7 @@ pub async fn start(mgmt_path: &str) -> AppManager {
     let listener = tokio::net::UnixListener::bind(mgmt_path).unwrap();
     println!("Potato server listening on {mgmt_path}");
 
-    let mgmt_app = crate::api::management_app(manager.clone());
+    let mgmt_app = crate::api::potato_router(manager.clone());
     tokio::spawn(async move {
         axum::serve(listener, mgmt_app).await.unwrap();
     });
