@@ -1,6 +1,5 @@
 use axum::extract::Path;
 use axum::{Json, extract::State};
-use tokio::io::AsyncWriteExt;
 
 use super::super::state::AppState;
 
@@ -16,20 +15,9 @@ pub(crate) async fn handler(
 ) -> Json<serde_json::Value> {
     let line = serde_json::to_string(&body.data).unwrap() + "\n";
 
-    for _ in 0..20 {
-        {
-            let writers = state.stdin_writers.lock().await;
-            if let Some(writer) = writers.get(&call_id) {
-                let mut guard = writer.lock().await;
-                if let Some(ref mut w) = *guard
-                    && w.write_all(line.as_bytes()).await.is_ok()
-                {
-                    return Json(serde_json::json!({"ok": true}));
-                }
-            }
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    if state.write_stdin(&call_id, line.as_bytes()).await {
+        Json(serde_json::json!({"ok": true}))
+    } else {
+        Json(serde_json::json!({"ok": false, "error": "call not found or not started"}))
     }
-
-    Json(serde_json::json!({"ok": false, "error": "call not found or not started"}))
 }
