@@ -82,9 +82,21 @@ impl PotatoApp {
     }
 
     /// Render a command's output through a template.
-    pub async fn render(&self, script: &str, body: &str) -> anyhow::Result<Vec<u8>> {
+    pub async fn render(
+        &self,
+        script: &str,
+        body: &str,
+        content_type: &str,
+    ) -> anyhow::Result<Vec<u8>> {
         let path = format!("/render/{script}");
-        self.conn.fetch("POST", &path, Some(body.as_bytes())).await
+        self.conn
+            .fetch_with_headers(
+                "POST",
+                &path,
+                Some(body.as_bytes()),
+                &[("Content-Type", content_type)],
+            )
+            .await
     }
 
     /// Fetch a static file from the app.

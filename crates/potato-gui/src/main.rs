@@ -59,10 +59,11 @@ async fn render(
     state: tauri::State<'_, AppState>,
     script: String,
     body: String,
+    content_type: String,
 ) -> Result<String, String> {
     let response = state
         .0
-        .render(&script, &body)
+        .render(&script, &body, &content_type)
         .await
         .map_err(|e| e.to_string())?;
     String::from_utf8(response).map_err(|e| format!("invalid response: {e}"))

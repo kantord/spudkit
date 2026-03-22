@@ -32,7 +32,8 @@
     // Intercept POST /render/{script}
     var renderMatch = url.match(/^\/render\/(.+)$/);
     if (renderMatch && method === "POST") {
-      return invoke("render", { script: renderMatch[1], body: init.body || "{}" }).then(function (text) {
+      var ct = (init.headers && (init.headers["Content-Type"] || init.headers["content-type"])) || "application/json";
+      return invoke("render", { script: renderMatch[1], body: init.body || "{}", contentType: ct }).then(function (text) {
         return new Response(text, {
           status: 200,
           headers: { "Content-Type": "text/html" },
@@ -52,6 +53,7 @@
     var xhr = new NativeXHR();
     var _method = "GET";
     var _url = "";
+    var _contentType = "application/json";
 
     var origOpen = xhr.open.bind(xhr);
     var origSend = xhr.send.bind(xhr);
@@ -60,10 +62,12 @@
     xhr.open = function (method, url) {
       _method = method;
       _url = url;
+      _contentType = "application/json";
       origOpen.apply(xhr, arguments);
     };
 
     xhr.setRequestHeader = function (key, value) {
+      if (key.toLowerCase() === "content-type") _contentType = value;
       origSetHeader(key, value);
     };
 
@@ -71,7 +75,7 @@
       // Intercept POST /render/{script}
       var renderMatch = _url.match(/^\/render\/(.+)$/);
       if (renderMatch && _method.toUpperCase() === "POST") {
-        invoke("render", { script: renderMatch[1], body: body || "{}" })
+        invoke("render", { script: renderMatch[1], body: body || "{}", contentType: _contentType })
           .then(function (text) {
             Object.defineProperty(xhr, "status", { get: function () { return 200; } });
             Object.defineProperty(xhr, "responseText", { get: function () { return text; } });
