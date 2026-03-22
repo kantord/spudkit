@@ -119,11 +119,18 @@ impl PotatoConnection {
         let method: Method = method.parse().context("invalid HTTP method")?;
         let body_bytes = body.unwrap_or(&[]);
 
+        let has_content_type = extra_headers
+            .iter()
+            .any(|(k, _)| k.eq_ignore_ascii_case("content-type"));
+
         let mut builder = Request::builder()
             .method(method)
             .uri(uri)
-            .header("Host", "localhost")
-            .header("Content-Type", "application/json");
+            .header("Host", "localhost");
+
+        if !has_content_type {
+            builder = builder.header("Content-Type", "application/json");
+        }
 
         for (key, value) in extra_headers {
             builder = builder.header(*key, *value);
