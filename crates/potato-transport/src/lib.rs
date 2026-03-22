@@ -67,6 +67,19 @@ impl SseEvent {
         }
     }
 
+    /// Format the event's data for human-readable display.
+    /// Strings are returned unwrapped, everything else as JSON.
+    pub fn display_data(&self) -> Option<String> {
+        let data = match self {
+            Self::Output(d) | Self::Error(d) | Self::Custom { data: d, .. } => d,
+            Self::Started { .. } | Self::End => return None,
+        };
+        Some(match data {
+            serde_json::Value::String(s) => s.clone(),
+            other => other.to_string(),
+        })
+    }
+
     /// Serialize the event to a JSON string suitable for SSE data.
     pub fn to_json(&self) -> String {
         let value = match self {

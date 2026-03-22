@@ -42,7 +42,7 @@ pub(crate) async fn handler(
         }
     };
 
-    let router = crate::app(static_dir, container_id);
+    let router = crate::app_router(static_dir, container_id);
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });

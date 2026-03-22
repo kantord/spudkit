@@ -53,26 +53,6 @@ async fn send_call_stdin(
         .map_err(|e| e.to_string())
 }
 
-fn mime_for_path(path: &str) -> &'static str {
-    if path.ends_with(".html") || path == "/index.html" {
-        "text/html"
-    } else if path.ends_with(".js") {
-        "application/javascript"
-    } else if path.ends_with(".css") {
-        "text/css"
-    } else if path.ends_with(".json") {
-        "application/json"
-    } else if path.ends_with(".png") {
-        "image/png"
-    } else if path.ends_with(".svg") {
-        "image/svg+xml"
-    } else if path.ends_with(".woff2") {
-        "font/woff2"
-    } else {
-        "application/octet-stream"
-    }
-}
-
 fn main() {
     let app_name = std::env::args().nth(1).unwrap_or_else(|| {
         eprintln!("Usage: potato-app <app-name>");
@@ -99,7 +79,12 @@ fn main() {
             match rt.block_on(protocol_app.fetch_file(&path)) {
                 Ok(response_body) => tauri::http::Response::builder()
                     .status(200)
-                    .header("Content-Type", mime_for_path(&path))
+                    .header(
+                        "Content-Type",
+                        mime_guess::from_path(&path)
+                            .first_or_octet_stream()
+                            .as_ref(),
+                    )
                     .body(response_body)
                     .unwrap(),
                 Err(e) => tauri::http::Response::builder()

@@ -13,13 +13,6 @@ struct Args {
     command: Vec<String>,
 }
 
-fn format_data(data: &serde_json::Value) -> String {
-    match data {
-        serde_json::Value::String(s) => s.clone(),
-        other => other.to_string(),
-    }
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
@@ -33,17 +26,23 @@ async fn main() -> anyhow::Result<()> {
     let cmd = args.command;
     let output_handle = tokio::spawn(async move {
         let mut call_id_tx = Some(call_id_tx);
-        app.call(&cmd, |event| match event {
+        app.call(&cmd, |event| match &event {
             SseEvent::Started { call_id } => {
                 if let Some(tx) = call_id_tx.take() {
-                    let _ = tx.send(call_id);
+                    let _ = tx.send(call_id.clone());
                 }
             }
-            SseEvent::Output(data) | SseEvent::Custom { data, .. } => {
-                println!("{}", format_data(&data))
+            SseEvent::Error(_) => {
+                if let Some(text) = event.display_data() {
+                    eprintln!("{text}");
+                }
             }
-            SseEvent::Error(data) => eprintln!("{}", format_data(&data)),
             SseEvent::End => {}
+            _ => {
+                if let Some(text) = event.display_data() {
+                    println!("{text}");
+                }
+            }
         })
         .await;
     });

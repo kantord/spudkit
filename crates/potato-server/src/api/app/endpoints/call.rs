@@ -12,6 +12,19 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use super::super::state::{AppState, StdinWriter};
 
+type EventSender = mpsc::Sender<Result<Event, Infallible>>;
+
+async fn send_error(tx: &EventSender, msg: &str) {
+    let json = SseEvent::Error(serde_json::json!(msg)).to_json();
+    let _ = tx.send(Ok(Event::default().data(json))).await;
+}
+
+async fn send_event(tx: &EventSender, event: SseEvent) -> bool {
+    tx.send(Ok(Event::default().data(event.to_json())))
+        .await
+        .is_ok()
+}
+
 #[derive(serde::Deserialize)]
 pub(crate) struct CreateCallRequest {
     cmd: Vec<String>,
@@ -23,7 +36,7 @@ pub(crate) async fn handler(
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
     let (tx, rx) = mpsc::channel::<Result<Event, Infallible>>(32);
 
-    let call_id = crate::uuid();
+    let call_id = crate::utils::generate_id();
     let container_id = state.container_id.clone();
     let stdin_writers = state.stdin_writers.clone();
     let cid = call_id.clone();
@@ -31,24 +44,12 @@ pub(crate) async fn handler(
     tokio::spawn(async move {
         let container_id = match container_id {
             Some(id) => id,
-            None => {
-                let msg = SseEvent::Error(serde_json::json!("no container available for this app"))
-                    .to_json();
-                let _ = tx.send(Ok(Event::default().data(msg))).await;
-                return;
-            }
+            None => return send_error(&tx, "no container available for this app").await,
         };
 
         let docker = match Docker::connect_with_local_defaults() {
             Ok(d) => d,
-            Err(e) => {
-                let msg = SseEvent::Error(serde_json::json!(format!(
-                    "failed to connect to docker: {e}"
-                )))
-                .to_json();
-                let _ = tx.send(Ok(Event::default().data(msg))).await;
-                return;
-            }
+            Err(e) => return send_error(&tx, &format!("failed to connect to docker: {e}")).await,
         };
 
         let exec = match docker
@@ -65,12 +66,7 @@ pub(crate) async fn handler(
             .await
         {
             Ok(e) => e,
-            Err(e) => {
-                let msg = SseEvent::Error(serde_json::json!(format!("failed to create exec: {e}")))
-                    .to_json();
-                let _ = tx.send(Ok(Event::default().data(msg))).await;
-                return;
-            }
+            Err(e) => return send_error(&tx, &format!("failed to create exec: {e}")).await,
         };
 
         match docker.start_exec(&exec.id, None).await {
@@ -78,14 +74,13 @@ pub(crate) async fn handler(
                 let stdin_writer: StdinWriter = Arc::new(Mutex::new(Some(Box::new(input))));
                 stdin_writers.lock().await.insert(cid.clone(), stdin_writer);
 
-                let _ = tx
-                    .send(Ok(Event::default().data(
-                        SseEvent::Started {
-                            call_id: cid.clone(),
-                        }
-                        .to_json(),
-                    )))
-                    .await;
+                let _ = send_event(
+                    &tx,
+                    SseEvent::Started {
+                        call_id: cid.clone(),
+                    },
+                )
+                .await;
 
                 while let Some(Ok(log)) = output.next().await {
                     let (text, is_stderr) = match &log {
@@ -107,27 +102,17 @@ pub(crate) async fn handler(
                         } else {
                             SseEvent::from_stdout(line)
                         };
-                        if tx
-                            .send(Ok(Event::default().data(event.to_json())))
-                            .await
-                            .is_err()
-                        {
+                        if !send_event(&tx, event).await {
                             break;
                         }
                     }
                 }
 
-                let _ = tx
-                    .send(Ok(Event::default().data(SseEvent::End.to_json())))
-                    .await;
+                let _ = send_event(&tx, SseEvent::End).await;
                 stdin_writers.lock().await.remove(&cid);
             }
             Ok(StartExecResults::Detached) => {}
-            Err(e) => {
-                let msg = SseEvent::Error(serde_json::json!(format!("failed to start exec: {e}")))
-                    .to_json();
-                let _ = tx.send(Ok(Event::default().data(msg))).await;
-            }
+            Err(e) => send_error(&tx, &format!("failed to start exec: {e}")).await,
         }
     });
 

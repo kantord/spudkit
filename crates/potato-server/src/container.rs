@@ -20,7 +20,7 @@ impl AppContainer {
             ..Default::default()
         };
 
-        let name = format!("potato-{}", crate::uuid());
+        let name = format!("potato-{}", crate::utils::generate_id());
         let container = docker
             .create_container(
                 Some(CreateContainerOptions {
@@ -62,7 +62,7 @@ pub async fn extract_image(image: &str) -> anyhow::Result<PathBuf> {
         ..Default::default()
     };
 
-    let name = format!("potato-extract-{}", crate::uuid());
+    let name = format!("potato-extract-{}", crate::utils::generate_id());
     let container = docker
         .create_container(
             Some(CreateContainerOptions {
@@ -73,7 +73,7 @@ pub async fn extract_image(image: &str) -> anyhow::Result<PathBuf> {
         )
         .await?;
 
-    let extract_dir = std::env::temp_dir().join(format!("potato-{}", crate::uuid()));
+    let extract_dir = std::env::temp_dir().join(format!("potato-{}", crate::utils::generate_id()));
     std::fs::create_dir_all(&extract_dir)?;
 
     let (pipe_reader, mut pipe_writer) = os_pipe::pipe()?;
