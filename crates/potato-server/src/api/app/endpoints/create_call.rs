@@ -1,4 +1,3 @@
-use axum::extract::Path;
 use axum::response::sse::{Event, Sse};
 use axum::{Json, extract::State};
 use bollard::Docker;
@@ -6,32 +5,19 @@ use bollard::container::LogOutput;
 use bollard::exec::{CreateExecOptions, StartExecResults};
 use futures_util::{Stream, StreamExt};
 use potato_transport::SseEvent;
-use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::{Mutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 
-pub(crate) type StdinWriter = Arc<Mutex<Option<Box<dyn tokio::io::AsyncWrite + Send + Unpin>>>>;
-
-#[derive(Clone)]
-pub(crate) struct AppState {
-    pub container_id: Option<String>,
-    pub stdin_writers: Arc<Mutex<HashMap<String, StdinWriter>>>,
-}
+use super::super::state::{AppState, StdinWriter};
 
 #[derive(serde::Deserialize)]
 pub(crate) struct CreateCallRequest {
     cmd: Vec<String>,
 }
 
-#[derive(serde::Deserialize)]
-pub(crate) struct StdinRequest {
-    data: serde_json::Value,
-}
-
-pub(crate) async fn create_call(
+pub(crate) async fn handler(
     State(state): State<AppState>,
     Json(body): Json<CreateCallRequest>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
@@ -146,29 +132,4 @@ pub(crate) async fn create_call(
     });
 
     Sse::new(ReceiverStream::new(rx))
-}
-
-pub(crate) async fn call_stdin(
-    State(state): State<AppState>,
-    Path(call_id): Path<String>,
-    Json(body): Json<StdinRequest>,
-) -> Json<serde_json::Value> {
-    let line = serde_json::to_string(&body.data).unwrap() + "\n";
-
-    for _ in 0..20 {
-        {
-            let writers = state.stdin_writers.lock().await;
-            if let Some(writer) = writers.get(&call_id) {
-                let mut guard = writer.lock().await;
-                if let Some(ref mut w) = *guard
-                    && w.write_all(line.as_bytes()).await.is_ok()
-                {
-                    return Json(serde_json::json!({"ok": true}));
-                }
-            }
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-    }
-
-    Json(serde_json::json!({"ok": false, "error": "call not found or not started"}))
 }

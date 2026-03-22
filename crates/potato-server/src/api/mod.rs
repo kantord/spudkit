@@ -1,4 +1,5 @@
-mod endpoints;
-mod router;
+pub mod app;
+pub mod management;
 
-pub use router::potato_router;
+pub use app::app_router;
+pub use management::potato_router;

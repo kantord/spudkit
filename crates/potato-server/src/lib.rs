@@ -1,28 +1,13 @@
 mod api;
 mod app_manager;
-mod calls;
 pub mod container;
 
-use axum::{Router, routing::post};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tower_http::services::ServeDir;
-
+pub use api::{app_router, potato_router};
 pub use app_manager::start;
 pub use app_manager::{AppManager, RunningApp};
 
-pub fn app(static_dir: PathBuf, container_id: Option<String>) -> Router {
-    let state = calls::AppState {
-        container_id,
-        stdin_writers: Arc::new(Mutex::new(HashMap::new())),
-    };
-    Router::new()
-        .route("/calls", post(calls::create_call))
-        .route("/calls/{id}/stdin", post(calls::call_stdin))
-        .nest_service("/files", ServeDir::new(static_dir))
-        .with_state(state)
+pub fn app(static_dir: std::path::PathBuf, container_id: Option<String>) -> axum::Router {
+    app_router(static_dir, container_id)
 }
 
 fn uuid() -> String {
