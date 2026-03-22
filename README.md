@@ -91,7 +91,8 @@ Potato has built-in support for [HTMX](https://htmx.org/), making it possible to
 
 The `/render/{script}` endpoint runs a script, collects its output, renders it
 through a [Jinja2 template](https://jinja.palletsprojects.com/), and returns HTML.
-HTMX can swap this HTML directly into the page.
+
+The template rendering system is a convenience feature added to make it convenient to use HTMX.
 
 Form fields are automatically converted to JSON and sent as stdin to the script.
 
@@ -113,18 +114,23 @@ fi
 grep -i -n "$query" /book.txt
 ```
 
-**`app/templates/search.html`** — the template (Jinja2 syntax):
+**`app/templates/search.html`** - the template (Jinja2 syntax):
 
 ```html
 {% for line in lines %}
-<pre><code>{{ line }}</code></pre>
+  <pre>
+    <code>{{ line }}</code>
+  </pre>
 {% endfor %}
+
 {% if not lines %}
-<p><em>No results found.</em></p>
+  <p>
+    <em>No results found.</em>
+  </p>
 {% endif %}
 ```
 
-**`app/gui/index.html`** — the frontend (HTMX + Pico CSS):
+**`app/gui/index.html`** - the frontend (HTMX + Pico CSS):
 
 ```html
 <!DOCTYPE html>
@@ -153,7 +159,10 @@ grep -i -n "$query" /book.txt
 ```dockerfile
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y curl jq && rm -rf /var/lib/apt/lists/*
+
+# Download the book
 RUN curl -sL "https://www.gutenberg.org/cache/epub/11/pg11.txt" -o /book.txt
+
 COPY app/ /app/
 RUN chmod +x /app/bin/search.sh
 ```
@@ -165,11 +174,7 @@ docker build -t book-search .
 potato-app book-search
 ```
 
-The form sends `query=rabbit` → the server converts it to JSON → `search.sh` greps the book →
-output is rendered through the template → HTMX swaps the results into the page.
-No JavaScript, no build step, no framework.
-
-The same backend works from the CLI:
+You can still use the app from the CLI:
 
 ```sh
 echo '{"query": "rabbit"}' | potato book-search search.sh
