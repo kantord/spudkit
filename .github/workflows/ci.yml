@@ -103,6 +103,7 @@ jobs:
           docker pull debian:bookworm-slim
           docker build -t potato-hello-world images/hello-world
           docker build -t potato-hello-simple images/hello-simple
+          docker build -t potato-book-search images/book-search
 
       - name: Build Rust
         run: cargo build
@@ -113,5 +114,8 @@ jobs:
       - name: Install e2e dependencies
         run: cd e2e && pnpm install
 
-      - name: Run e2e tests
+      - name: Run e2e tests (hello-world)
         run: cd e2e && xvfb-run pnpm test
+
+      - name: Run e2e tests (book-search)
+        run: cd e2e && xvfb-run pnpm test:book-search

@@ -11,7 +11,7 @@ export const config: Options.Testrunner = {
   autoCompileOpts: {
     tsNodeOpts: { project: "./tsconfig.json" },
   },
-  specs: ["./specs/**/*.ts"],
+  specs: ["./specs/app-loads.ts"],
   maxInstances: 1,
 
   hostname: "127.0.0.1",
