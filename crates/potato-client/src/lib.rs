@@ -81,6 +81,30 @@ impl PotatoApp {
         Ok(())
     }
 
+    /// Forward a raw request to the app server.
+    pub async fn forward(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&[u8]>,
+        headers: &[(&str, &str)],
+    ) -> anyhow::Result<Vec<u8>> {
+        self.conn
+            .fetch_with_headers(method, path, body, headers)
+            .await
+    }
+
+    /// Forward a raw request and stream events via callback.
+    pub async fn stream_forward(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&[u8]>,
+        on_event: impl FnMut(SseEvent),
+    ) -> anyhow::Result<()> {
+        self.conn.stream(method, path, body, on_event).await
+    }
+
     /// Fetch a static file from the app.
     pub async fn fetch_file(&self, path: &str) -> anyhow::Result<Vec<u8>> {
         let server_path = format!("/files{path}");

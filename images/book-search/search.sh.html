@@ -1,0 +1,6 @@
+{% for line in lines %}
+<pre><code>{{ line }}</code></pre>
+{% endfor %}
+{% if not lines %}
+<p><em>No results found.</em></p>
+{% endif %}

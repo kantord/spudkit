@@ -67,6 +67,119 @@ echo '{"event": "progress", "data": {"percent": 50}}'
 
 Stderr output is automatically tagged as `{"event": "error", ...}`. When the process exits, an `{"event": "end"}` is sent.
 
+## Frontend Options
+
+Potato app frontends are just static web files. You can use any frontend technology:
+
+- **HTMX + shell scripts** — no JavaScript, no build step. Great for simple tools.
+- **React / Vue / Svelte** — use Vite or any bundler. The build output goes in `/app/gui/`.
+- **Vanilla JS** — just HTML, CSS, and `<script>` tags.
+
+For JS-based frontends, use the streaming `/calls` API to get real-time output from
+your backend scripts (word-by-word, line-by-line). For HTMX, use the `/render` endpoint
+which collects all output and returns rendered HTML — simpler, but not streaming.
+
+## HTMX Support
+
+Potato has built-in support for [HTMX](https://htmx.org/), making it possible to write web apps without having to write JavaScript.
+
+> **Note:** The `/render` endpoint waits for the script to finish before returning HTML.
+> For real-time streaming (e.g., chat, progress updates), use the `/calls` API with
+> JavaScript instead.
+
+### How it works
+
+The `/render/{script}` endpoint runs a script, collects its output, renders it
+through a [Jinja2 template](https://jinja.palletsprojects.com/), and returns HTML.
+
+The template rendering system is a convenience feature added to make it convenient to use HTMX.
+
+Form fields are automatically converted to JSON and sent as stdin to the script.
+
+### Quick example: Search in Alice's Adventures in Wonderland
+
+A full-text search app for Alice's Adventures in Wonderland in 3 simple files
+
+**`app/bin/search.sh`** — the backend (uses `grep` and `jq`):
+
+```sh
+#!/bin/sh
+query=$(jq -r '.query')
+
+if [ -z "$query" ]; then
+    echo "Please enter a search term"
+    exit 0
+fi
+
+grep -i -n "$query" /book.txt
+```
+
+**`app/templates/search.html`** - the template (Jinja2 syntax):
+
+```html
+{% for line in lines %}
+  <pre>
+    <code>{{ line }}</code>
+  </pre>
+{% endfor %}
+
+{% if not lines %}
+  <p>
+    <em>No results found.</em>
+  </p>
+{% endif %}
+```
+
+**`app/gui/index.html`** - the frontend (HTMX + Pico CSS):
+
+```html
+<!DOCTYPE html>
+<html data-theme="dark">
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body>
+    <main class="container">
+        <h1>Book Search</h1>
+        <form hx-post="/render/search.sh" hx-target="#results">
+            <fieldset role="group">
+                <input type="text" name="query" placeholder="Search..." autofocus />
+                <button type="submit">Search</button>
+            </fieldset>
+        </form>
+        <section id="results"></section>
+    </main>
+</body>
+</html>
+```
+
+**`Dockerfile`**:
+
+```dockerfile
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y curl jq && rm -rf /var/lib/apt/lists/*
+
+# Download the book
+RUN curl -sL "https://www.gutenberg.org/cache/epub/11/pg11.txt" -o /book.txt
+
+COPY app/ /app/
+RUN chmod +x /app/bin/search.sh
+```
+
+Build and run:
+
+```sh
+docker build -t book-search .
+potato-app book-search
+```
+
+You can still use the app from the CLI:
+
+```sh
+echo '{"query": "rabbit"}' | potato book-search search.sh
+```
+
 ## CLI Composability
 
 Potato apps work like Unix tools:
