@@ -73,13 +73,7 @@ pub(crate) async fn handler(
         }
     };
 
-    // Look for a template matching the script name in /app/templates/
-    let template_name = script
-        .trim_start_matches('/')
-        .strip_suffix(".sh")
-        .unwrap_or(script.trim_start_matches('/'))
-        .to_string()
-        + ".html";
+    let template_name = format!("{}.html", script.trim_start_matches('/'));
 
     let template_file = state.static_dir.join("app/templates").join(&template_name);
 
