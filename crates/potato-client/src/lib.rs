@@ -81,22 +81,33 @@ impl PotatoApp {
         Ok(())
     }
 
-    /// Render a command's output through a template.
-    pub async fn render(
+    /// Forward a request to the app server and return the response body.
+    pub async fn forward(
         &self,
-        script: &str,
-        body: &str,
-        content_type: &str,
+        method: &str,
+        path: &str,
+        body: Option<&[u8]>,
+        content_type: Option<&str>,
     ) -> anyhow::Result<Vec<u8>> {
-        let path = format!("/render/{script}");
-        self.conn
-            .fetch_with_headers(
-                "POST",
-                &path,
-                Some(body.as_bytes()),
-                &[("Content-Type", content_type)],
-            )
-            .await
+        match content_type {
+            Some(ct) => {
+                self.conn
+                    .fetch_with_headers(method, path, body, &[("Content-Type", ct)])
+                    .await
+            }
+            None => self.conn.fetch(method, path, body).await,
+        }
+    }
+
+    /// Forward a request to the app server and stream events via callback.
+    pub async fn stream_forward(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&[u8]>,
+        on_event: impl FnMut(SseEvent),
+    ) -> anyhow::Result<()> {
+        self.conn.stream(method, path, body, on_event).await
     }
 
     /// Fetch a static file from the app.

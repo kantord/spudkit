@@ -7,66 +7,41 @@ use tauri::webview::WebviewWindowBuilder;
 
 struct AppState(PotatoApp);
 
+/// Generic forward: send a request to the app server and return the response.
 #[tauri::command]
-async fn create_call(
+async fn forward(
     state: tauri::State<'_, AppState>,
-    body: String,
-    on_event: Channel<String>,
-) -> Result<(), String> {
-    let cmd: Vec<String> = serde_json::from_str::<serde_json::Value>(&body)
-        .ok()
-        .and_then(|v| {
-            v.get("cmd")?
-                .as_array()?
-                .iter()
-                .map(|s| s.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    state
-        .0
-        .call(&cmd, |event| {
-            let _ = on_event.send(event.to_json());
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[tauri::command]
-async fn send_call_stdin(
-    state: tauri::State<'_, AppState>,
-    call_id: String,
-    data: String,
-) -> Result<(), String> {
-    let value: serde_json::Value =
-        serde_json::from_str(&data).map_err(|e| format!("invalid JSON: {e}"))?;
-    let stdin_data = value
-        .get("data")
-        .cloned()
-        .unwrap_or(serde_json::Value::Null);
-    state
-        .0
-        .send_stdin(&call_id, &stdin_data)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn render(
-    state: tauri::State<'_, AppState>,
-    script: String,
-    body: String,
-    content_type: String,
+    method: String,
+    path: String,
+    body: Option<String>,
+    content_type: Option<String>,
 ) -> Result<String, String> {
+    let body_bytes = body.as_deref().map(|b| b.as_bytes());
     let response = state
         .0
-        .render(&script, &body, &content_type)
+        .forward(&method, &path, body_bytes, content_type.as_deref())
         .await
         .map_err(|e| e.to_string())?;
     String::from_utf8(response).map_err(|e| format!("invalid response: {e}"))
+}
+
+/// Generic stream: send a request and stream events back via Channel.
+#[tauri::command]
+async fn stream(
+    state: tauri::State<'_, AppState>,
+    method: String,
+    path: String,
+    body: Option<String>,
+    on_event: Channel<String>,
+) -> Result<(), String> {
+    let body_bytes = body.as_deref().map(|b| b.as_bytes());
+    state
+        .0
+        .stream_forward(&method, &path, body_bytes, |event| {
+            let _ = on_event.send(event.to_json());
+        })
+        .await
+        .map_err(|e| e.to_string())
 }
 
 fn main() {
@@ -110,11 +85,7 @@ fn main() {
                     .expect("valid HTTP response"),
             }
         })
-        .invoke_handler(tauri::generate_handler![
-            create_call,
-            send_call_stdin,
-            render
-        ])
+        .invoke_handler(tauri::generate_handler![forward, stream])
         .setup(move |tauri_app| {
             tauri_app.manage(AppState(app));
 
