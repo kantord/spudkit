@@ -30,6 +30,10 @@ install:
 lint:
     cargo clippy -- -D warnings
 
+# Type-check the GUI TypeScript
+typecheck:
+    cd crates/potato-gui && pnpm typecheck
+
 # Run all pre-commit checks
 check:
     prek run --all-files
