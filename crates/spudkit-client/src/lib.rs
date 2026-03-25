@@ -31,7 +31,7 @@ impl SpudkitClient {
             .server
             .fetch("POST", "/activate", Some(body.to_string().as_bytes()))
             .await
-            .context("is spudkit-server running?")?;
+            .context("is spudkit running?")?;
 
         let result: serde_json::Value = serde_json::from_slice(&response)?;
         if result.get("ok") != Some(&serde_json::Value::Bool(true)) {

@@ -22,7 +22,7 @@ frontend:
 
 # Install all binaries locally
 install:
-    cargo install --path crates/spudkit-server
+    cargo install --path crates/spudkit
     cargo install --path crates/spudkit-cli
     cargo install --path crates/spudkit-gui
 
@@ -56,7 +56,7 @@ all: build images test e2e-all
 
 # Start the server
 server:
-    cargo run -p spudkit-server
+    cargo run -p spudkit
 
 # Open an app in the GUI (usage: just app spudkit-hello-world)
 app name:
