@@ -3518,6 +3518,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "spudkit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "bollard",
+ "clap",
+ "form_urlencoded",
+ "futures-util",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "minijinja",
+ "os_pipe",
+ "rstest",
+ "serde",
+ "serde_json",
+ "spudkit-transport",
+ "tar",
+ "tokio",
+ "tokio-stream",
+ "tower",
+ "tower-http",
+ "uuid",
+]
+
+[[package]]
 name = "spudkit-cli"
 version = "0.1.0"
 dependencies = [
@@ -3548,33 +3575,6 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tokio",
-]
-
-[[package]]
-name = "spudkit-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "bollard",
- "clap",
- "form_urlencoded",
- "futures-util",
- "http-body-util",
- "hyper",
- "hyper-util",
- "minijinja",
- "os_pipe",
- "rstest",
- "serde",
- "serde_json",
- "spudkit-transport",
- "tar",
- "tokio",
- "tokio-stream",
- "tower",
- "tower-http",
- "uuid",
 ]
 
 [[package]]

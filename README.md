@@ -32,7 +32,7 @@ stdin, stdout and stderr.
 
 ```mermaid
 graph TB
-    IMAGE["Docker Image"] --> SERVER["spudkit-server"]
+    IMAGE["Docker Image"] --> SERVER["spudkit"]
     SERVER -- "index.html" --> BROWSER["Browser Engine\n(system webview)"]
     SERVER -- "script.sh" --> DOCKER["Container Engine\n(Docker)"]
     BROWSER <-- "input/output streams" --> DOCKER

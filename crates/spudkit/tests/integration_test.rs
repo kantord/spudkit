@@ -8,11 +8,10 @@ use tower::ServiceExt;
 #[fixture]
 async fn app() -> axum::Router {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-    let container =
-        spudkit_server::container::AppContainer::start_unchecked("debian:bookworm-slim")
-            .await
-            .expect("failed to start container");
-    spudkit_server::app_router(dir, Some(container.id))
+    let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
+        .await
+        .expect("failed to start container");
+    spudkit::app_router(dir, Some(container.id))
 }
 
 fn parse_sse_events(body: &str) -> Vec<serde_json::Value> {
@@ -109,10 +108,9 @@ async fn call_started_event_contains_call_id(#[future] app: axum::Router) {
 /// Helper to create a test app with a script installed in /app/bin/
 async fn app_with_script(script_name: &str, script_content: &str) -> axum::Router {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-    let container =
-        spudkit_server::container::AppContainer::start_unchecked("debian:bookworm-slim")
-            .await
-            .expect("failed to start container");
+    let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
+        .await
+        .expect("failed to start container");
 
     // Install the script into the container
     let install_cmd = vec![
@@ -133,7 +131,7 @@ async fn app_with_script(script_name: &str, script_content: &str) -> axum::Route
     use futures_util::StreamExt;
     while output.next().await.is_some() {}
 
-    spudkit_server::app_router(dir, Some(container.id))
+    spudkit::app_router(dir, Some(container.id))
 }
 
 #[tokio::test]
@@ -224,11 +222,10 @@ async fn render_accepts_json_with_data_field() {
 #[tokio::test]
 async fn render_nonexistent_script_returns_error() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
-    let container =
-        spudkit_server::container::AppContainer::start_unchecked("debian:bookworm-slim")
-            .await
-            .expect("failed to start container");
-    let app = spudkit_server::app_router(dir, Some(container.id));
+    let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
+        .await
+        .expect("failed to start container");
+    let app = spudkit::app_router(dir, Some(container.id));
 
     let response = app
         .oneshot(
@@ -257,7 +254,7 @@ async fn render_nonexistent_script_returns_error() {
 
 #[tokio::test]
 async fn spudkit_image_rejects_unlabeled_image() {
-    let result = spudkit_server::container::SpudkitImage::new("debian:bookworm-slim").await;
+    let result = spudkit::container::SpudkitImage::new("debian:bookworm-slim").await;
     match result {
         Ok(_) => panic!("expected SpudkitImage::new to reject unlabeled image"),
         Err(err) => {

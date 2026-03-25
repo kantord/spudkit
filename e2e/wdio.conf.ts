@@ -37,7 +37,7 @@ export const config: Options.Testrunner = {
 
   onPrepare() {
     spudkitServer = spawn(
-      path.join(rootDir, "target/debug/spudkit-server"),
+      path.join(rootDir, "target/debug/spudkit"),
       [],
       {
         stdio: "pipe",
