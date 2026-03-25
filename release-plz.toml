@@ -1,2 +1,6 @@
 [workspace]
 semver_check = false
+
+[[package]]
+name = "spudkit-gui"
+publish_allow_dirty = true
