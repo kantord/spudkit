@@ -6,7 +6,6 @@ use axum::response::{Html, IntoResponse, Response};
 use std::sync::LazyLock;
 
 use super::super::state::AppState;
-use crate::container::AppContainer;
 
 static TEMPLATE_ENGINE: LazyLock<minijinja::Environment<'static>> =
     LazyLock::new(minijinja::Environment::new);
@@ -47,9 +46,10 @@ pub(crate) async fn handler(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let container = AppContainer {
-        id: state.container_id.clone(),
-    };
+    let container = state.container.clone();
+    if crate::utils::resolve_container_path("/app/bin", &script).is_none() {
+        return (axum::http::StatusCode::BAD_REQUEST, "invalid script name").into_response();
+    }
     let resolved_cmd = crate::utils::resolve_cmd(std::slice::from_ref(&script));
     let stdin_data = parse_stdin_data(&headers, &body);
 
@@ -65,12 +65,24 @@ pub(crate) async fn handler(
     };
 
     let template_name = format!("{}.html", script.trim_start_matches('/'));
+    let template_path = match crate::utils::resolve_container_path("/app/templates", &template_name)
+    {
+        Some(p) => p,
+        None => return output_lines.join("\n").into_response(),
+    };
 
-    let template_file = state.static_dir.join("app/templates").join(&template_name);
-
-    let template_content = match std::fs::read_to_string(&template_file) {
-        Ok(t) => t,
-        Err(_) => {
+    let template_content = match container.cat_file(&template_path).await {
+        Ok(Some(bytes)) => match String::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "template is not valid UTF-8",
+                )
+                    .into_response();
+            }
+        },
+        _ => {
             return output_lines.join("\n").into_response();
         }
     };

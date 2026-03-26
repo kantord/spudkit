@@ -4,7 +4,6 @@ use bollard::exec::{CreateExecOptions, StartExecResults};
 use bollard::models::ContainerCreateBody;
 use bollard::query_parameters::{CreateContainerOptions, RemoveContainerOptions};
 use futures_util::{Stream, StreamExt};
-use std::path::PathBuf;
 use std::pin::Pin;
 
 const SPUDKIT_LABEL: &str = "io.github.kantord.spudkit.version";
@@ -63,14 +62,10 @@ impl SpudkitImage {
 
         Ok(AppContainer { id: container.id })
     }
-
-    /// Extract the image's filesystem to a temp directory.
-    pub async fn extract(&self) -> anyhow::Result<PathBuf> {
-        extract_image_inner(&self.name).await
-    }
 }
 
 /// A running app container.
+#[derive(Clone)]
 pub struct AppContainer {
     pub id: String,
 }
@@ -172,6 +167,46 @@ impl AppContainer {
         Ok(lines)
     }
 
+    /// Read a file from the container as raw bytes.
+    /// Returns `Ok(None)` if the file does not exist.
+    pub async fn cat_file(&self, path: &str) -> anyhow::Result<Option<Vec<u8>>> {
+        let docker = Docker::connect_with_local_defaults()?;
+
+        let exec = docker
+            .create_exec(
+                &self.id,
+                CreateExecOptions::<String> {
+                    cmd: Some(vec!["cat".into(), path.into()]),
+                    attach_stdout: Some(true),
+                    attach_stderr: Some(true),
+                    ..Default::default()
+                },
+            )
+            .await?;
+
+        let exec_id = exec.id.clone();
+
+        match docker.start_exec(&exec.id, None).await? {
+            StartExecResults::Attached { mut output, .. } => {
+                let mut bytes = Vec::new();
+                while let Some(Ok(log)) = output.next().await {
+                    if let LogOutput::StdOut { message } = log {
+                        bytes.extend_from_slice(&message);
+                    }
+                }
+                let inspect = docker.inspect_exec(&exec_id).await?;
+                if inspect.exit_code == Some(0) {
+                    Ok(Some(bytes))
+                } else {
+                    Ok(None)
+                }
+            }
+            StartExecResults::Detached => {
+                anyhow::bail!("exec started in detached mode")
+            }
+        }
+    }
+
     /// Stop and remove the container.
     pub async fn stop(&self) {
         if let Ok(docker) = Docker::connect_with_local_defaults() {
@@ -186,76 +221,4 @@ impl AppContainer {
                 .await;
         }
     }
-}
-
-async fn extract_image_inner(image: &str) -> anyhow::Result<PathBuf> {
-    let docker = Docker::connect_with_local_defaults()?;
-
-    let config = ContainerCreateBody {
-        image: Some(image.to_string()),
-        cmd: Some(vec!["true".to_string()]),
-        ..Default::default()
-    };
-
-    let name = format!("spudkit-extract-{}", crate::utils::generate_id());
-    let container = docker
-        .create_container(
-            Some(CreateContainerOptions {
-                name: Some(name),
-                ..Default::default()
-            }),
-            config,
-        )
-        .await?;
-
-    let extract_dir = std::env::temp_dir().join(format!("spudkit-{}", crate::utils::generate_id()));
-    std::fs::create_dir_all(&extract_dir)?;
-
-    let (pipe_reader, mut pipe_writer) = os_pipe::pipe()?;
-    let extract_dir_clone = extract_dir.clone();
-
-    let unpack_handle = std::thread::spawn(
-        move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-            let mut archive = tar::Archive::new(pipe_reader);
-            archive.set_preserve_permissions(false);
-            archive.set_unpack_xattrs(false);
-            for entry in archive.entries()? {
-                let mut entry = match entry {
-                    Ok(e) => e,
-                    Err(_) => continue,
-                };
-                let kind = entry.header().entry_type();
-                if kind.is_file() || kind.is_dir() || kind.is_symlink() || kind.is_hard_link() {
-                    let _ = entry.unpack_in(&extract_dir_clone);
-                }
-            }
-            Ok(())
-        },
-    );
-
-    let mut tar_stream = docker.export_container(&container.id);
-    while let Some(chunk) = tar_stream.next().await {
-        let chunk = chunk?;
-        if std::io::Write::write_all(&mut pipe_writer, &chunk).is_err() {
-            break;
-        }
-    }
-    drop(pipe_writer);
-
-    unpack_handle
-        .join()
-        .map_err(|_| anyhow::anyhow!("unpack thread panicked"))?
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
-
-    let _ = docker
-        .remove_container(
-            &container.id,
-            Some(RemoveContainerOptions {
-                force: true,
-                ..Default::default()
-            }),
-        )
-        .await;
-
-    Ok(extract_dir)
 }
