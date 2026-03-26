@@ -432,3 +432,37 @@ async fn files_serves_binary_content() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     assert_eq!(body.to_vec(), png_bytes);
 }
+
+// --- path traversal tests ---
+
+#[tokio::test]
+async fn files_traversal_cannot_read_etc_passwd() {
+    let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
+        .await
+        .expect("failed to start container");
+
+    install_file(&container, "/app/gui/index.html", b"hello").await;
+
+    let app = spudkit::app_router(container.id);
+
+    // Try various traversal techniques
+    let paths = [
+        "/files/..%2f..%2fetc%2fpasswd",
+        "/files/..%252f..%252fetc%252fpasswd",
+    ];
+
+    for path in paths {
+        let response = app
+            .clone()
+            .oneshot(Request::get(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let text = String::from_utf8_lossy(&body);
+        assert!(
+            !text.contains("root:"),
+            "path {path} leaked /etc/passwd: {text}"
+        );
+    }
+}

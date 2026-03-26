@@ -65,7 +65,11 @@ pub(crate) async fn handler(
     };
 
     let template_name = format!("{}.html", script.trim_start_matches('/'));
-    let template_path = format!("/app/templates/{template_name}");
+    let template_path = match crate::utils::resolve_container_path("/app/templates", &template_name)
+    {
+        Some(p) => p,
+        None => return output_lines.join("\n").into_response(),
+    };
 
     let template_content = match container.cat_file(&template_path).await {
         Ok(Some(bytes)) => match String::from_utf8(bytes) {

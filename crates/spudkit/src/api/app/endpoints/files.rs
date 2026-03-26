@@ -9,7 +9,10 @@ pub(crate) async fn handler(State(state): State<AppState>, Path(path): Path<Stri
     let container = AppContainer {
         id: state.container_id.clone(),
     };
-    let container_path = format!("/app/gui/{path}");
+    let container_path = match crate::utils::resolve_container_path("/app/gui", &path) {
+        Some(p) => p,
+        None => return StatusCode::NOT_FOUND.into_response(),
+    };
 
     match container.cat_file(&container_path).await {
         Ok(Some(bytes)) => {
