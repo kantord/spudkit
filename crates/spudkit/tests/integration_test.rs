@@ -2,16 +2,41 @@ use axum::body::Body;
 use http_body_util::BodyExt;
 use hyper::Request;
 use rstest::*;
-use std::path::PathBuf;
 use tower::ServiceExt;
+
+async fn install_file(container: &spudkit::container::AppContainer, path: &str, content: &[u8]) {
+    use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
+    let dir = std::path::Path::new(path)
+        .parent()
+        .unwrap()
+        .to_str()
+        .unwrap();
+
+    let cmd = vec![
+        "/bin/sh".to_string(),
+        "-c".to_string(),
+        format!("mkdir -p {dir} && cat > {path}"),
+    ];
+    let attached = container.exec(cmd).await.unwrap();
+    let mut input = attached.input;
+    input.write_all(content).await.unwrap();
+    input.shutdown().await.unwrap();
+    drop(input);
+    let mut output = attached.output;
+    while output.next().await.is_some() {}
+}
 
 #[fixture]
 async fn app() -> axum::Router {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
         .await
         .expect("failed to start container");
-    spudkit::app_router(dir, container.id)
+
+    install_file(&container, "/app/gui/index.html", b"<h1>test</h1>\n").await;
+
+    spudkit::app_router(container.id)
 }
 
 fn parse_sse_events(body: &str) -> Vec<serde_json::Value> {
@@ -107,7 +132,6 @@ async fn call_started_event_contains_call_id(#[future] app: axum::Router) {
 
 /// Helper to create a test app with a script installed in /app/bin/
 async fn app_with_script(script_name: &str, script_content: &str) -> axum::Router {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
         .await
         .expect("failed to start container");
@@ -131,12 +155,52 @@ async fn app_with_script(script_name: &str, script_content: &str) -> axum::Route
     use futures_util::StreamExt;
     while output.next().await.is_some() {}
 
-    spudkit::app_router(dir, container.id)
+    spudkit::app_router(container.id)
+}
+
+/// Helper to create a test app with a script and a template
+async fn app_with_script_and_template(
+    script_name: &str,
+    script_content: &str,
+    template_content: &[u8],
+) -> axum::Router {
+    let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
+        .await
+        .expect("failed to start container");
+
+    // Install the script
+    let install_cmd = vec![
+        "/bin/sh".to_string(),
+        "-c".to_string(),
+        format!(
+            "mkdir -p /app/bin && cat > /app/bin/{script_name} && chmod +x /app/bin/{script_name}"
+        ),
+    ];
+    let attached = container.exec(install_cmd).await.unwrap();
+    use tokio::io::AsyncWriteExt;
+    let mut input = attached.input;
+    input.write_all(script_content.as_bytes()).await.unwrap();
+    input.shutdown().await.unwrap();
+    drop(input);
+    let mut output = attached.output;
+    use futures_util::StreamExt;
+    while output.next().await.is_some() {}
+
+    // Install the template
+    let template_name = format!("{script_name}.html");
+    install_file(
+        &container,
+        &format!("/app/templates/{template_name}"),
+        template_content,
+    )
+    .await;
+
+    spudkit::app_router(container.id)
 }
 
 #[tokio::test]
 async fn render_returns_plain_text_without_template() {
-    // date.sh has no matching template in fixtures
+    // date.sh has no matching template
     let app = app_with_script("date.sh", "#!/bin/sh\ndate").await;
 
     let response = app
@@ -157,8 +221,12 @@ async fn render_returns_plain_text_without_template() {
 
 #[tokio::test]
 async fn render_with_template_returns_html() {
-    // echo.sh has a matching template at fixtures/app/templates/echo.html
-    let app = app_with_script("echo.sh", "#!/bin/sh\necho hello\necho world").await;
+    let app = app_with_script_and_template(
+        "echo.sh",
+        "#!/bin/sh\necho hello\necho world",
+        b"{% for line in lines %}\n<p>{{ line }}</p>\n{% endfor %}\n",
+    )
+    .await;
 
     let response = app
         .oneshot(
@@ -221,11 +289,10 @@ async fn render_accepts_json_with_data_field() {
 
 #[tokio::test]
 async fn render_nonexistent_script_returns_error() {
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
     let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
         .await
         .expect("failed to start container");
-    let app = spudkit::app_router(dir, container.id);
+    let app = spudkit::app_router(container.id);
 
     let response = app
         .oneshot(
@@ -315,4 +382,53 @@ async fn files_returns_404_for_missing_file(#[future] app: axum::Router) {
         .unwrap();
 
     assert_eq!(response.status(), 404);
+}
+
+#[tokio::test]
+async fn files_serves_binary_content() {
+    // Minimal valid 1x1 red PNG
+    let png_bytes: Vec<u8> = vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1
+        0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // 8-bit RGB
+        0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, // IDAT chunk
+        0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, // compressed data
+        0x00, 0x00, 0x02, 0x00, 0x01, 0xE2, 0x21, 0xBC, // ...
+        0x33, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, // IEND chunk
+        0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+
+    let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
+        .await
+        .expect("failed to start container");
+
+    install_file(&container, "/app/gui/image.png", &png_bytes).await;
+
+    let app = spudkit::app_router(container.id);
+
+    let response = app
+        .oneshot(
+            Request::get("/files/image.png")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), 200);
+
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        content_type.contains("image/png"),
+        "expected image/png, got {content_type}"
+    );
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body.to_vec(), png_bytes);
 }

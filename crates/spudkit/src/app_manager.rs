@@ -30,8 +30,6 @@ impl AppManager {
 
         let spudkit_image = SpudkitImage::new(image).await?;
 
-        let static_dir = spudkit_image.extract().await?;
-
         let container = spudkit_image.start().await?;
         let container_id = container.id.clone();
 
@@ -40,7 +38,7 @@ impl AppManager {
 
         let listener = tokio::net::UnixListener::bind(&path)?;
 
-        let router = crate::app_router(static_dir, container_id);
+        let router = crate::app_router(container_id);
         tokio::spawn(async move {
             axum::serve(listener, router).await.unwrap();
         });

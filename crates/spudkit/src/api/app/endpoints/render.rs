@@ -65,12 +65,20 @@ pub(crate) async fn handler(
     };
 
     let template_name = format!("{}.html", script.trim_start_matches('/'));
+    let template_path = format!("/app/templates/{template_name}");
 
-    let template_file = state.static_dir.join("app/templates").join(&template_name);
-
-    let template_content = match std::fs::read_to_string(&template_file) {
-        Ok(t) => t,
-        Err(_) => {
+    let template_content = match container.cat_file(&template_path).await {
+        Ok(Some(bytes)) => match String::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(_) => {
+                return (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    "template is not valid UTF-8",
+                )
+                    .into_response();
+            }
+        },
+        _ => {
             return output_lines.join("\n").into_response();
         }
     };
