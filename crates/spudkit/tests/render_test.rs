@@ -123,3 +123,39 @@ async fn render_nonexistent_script_returns_error() {
         "expected error for nonexistent script, got status={status} body={text}"
     );
 }
+
+#[tokio::test]
+async fn render_traversal_cannot_execute_arbitrary_binaries() {
+    let container = spudkit::container::AppContainer::start_unchecked("debian:bookworm-slim")
+        .await
+        .expect("failed to start container");
+
+    // Create /app/bin/ so the traversal path resolves
+    helpers::install_file(&container, "/app/bin/.keep", b"").await;
+
+    let app = spudkit::app_router(container.id);
+
+    // ..%2f..%2f decodes to ../../ — so the script path becomes
+    // /app/bin/../../bin/date → /bin/date
+    // If traversal isn't blocked, this executes /bin/date successfully
+    // and returns a date string instead of an error
+    let response = app
+        .oneshot(
+            Request::post("/render/..%2f..%2fbin%2fdate")
+                .header("Content-Type", "application/json")
+                .body(Body::from("{}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let status = response.status().as_u16();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let text = String::from_utf8_lossy(&body);
+    // If the traversal works, /bin/date runs and returns a date string (e.g. "Thu Mar 26")
+    // If blocked, we get an error
+    assert!(
+        status >= 400 || text.contains("no such file") || text.contains("exec failed"),
+        "path traversal in /render executed /bin/date: status={status} body={text}"
+    );
+}

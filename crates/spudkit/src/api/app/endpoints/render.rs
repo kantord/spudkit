@@ -47,6 +47,9 @@ pub(crate) async fn handler(
     body: Bytes,
 ) -> Response {
     let container = state.container.clone();
+    if crate::utils::resolve_container_path("/app/bin", &script).is_none() {
+        return (axum::http::StatusCode::BAD_REQUEST, "invalid script name").into_response();
+    }
     let resolved_cmd = crate::utils::resolve_cmd(std::slice::from_ref(&script));
     let stdin_data = parse_stdin_data(&headers, &body);
 
