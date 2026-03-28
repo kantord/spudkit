@@ -62,7 +62,7 @@ impl AppManager {
         for (name, app) in apps.iter() {
             println!("[{name}] Stopping container...");
             app.container.stop().await;
-            let spud = Spud::new(name);
+            let spud = Spud::new(name).expect("stored name should be valid");
             let _ = std::fs::remove_file(spud.socket_path());
         }
     }

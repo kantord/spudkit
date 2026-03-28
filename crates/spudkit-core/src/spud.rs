@@ -6,10 +6,14 @@ pub struct Spud {
 
 impl Spud {
     /// Create a spud from a short name (e.g., "hello-world").
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
+    /// Returns an error if the name is empty or contains invalid characters.
+    pub fn new(name: &str) -> anyhow::Result<Self> {
+        if name.is_empty() || name.contains('/') || name.contains("..") {
+            anyhow::bail!("invalid spud name: {name:?}");
         }
+        Ok(Self {
+            name: name.to_string(),
+        })
     }
 
     /// The short display name (e.g., "hello-world").
@@ -31,22 +35,32 @@ impl Spud {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     #[test]
     fn image_name_has_prefix() {
-        let spud = Spud::new("hello-world");
+        let spud = Spud::new("hello-world").unwrap();
         assert_eq!(spud.image_name(), "spud-hello-world");
     }
 
     #[test]
     fn socket_path_uses_name() {
-        let spud = Spud::new("hello-world");
+        let spud = Spud::new("hello-world").unwrap();
         assert_eq!(spud.socket_path(), "/tmp/spudkit-hello-world.sock");
     }
 
     #[test]
     fn name_returns_short_name() {
-        let spud = Spud::new("hello-world");
+        let spud = Spud::new("hello-world").unwrap();
         assert_eq!(spud.name(), "hello-world");
+    }
+
+    #[rstest]
+    #[case::empty("")]
+    #[case::slash("foo/bar")]
+    #[case::dotdot("..")]
+    #[case::traversal("../../etc")]
+    fn rejects_invalid_names(#[case] name: &str) {
+        assert!(Spud::new(name).is_err(), "should reject: {name:?}");
     }
 }

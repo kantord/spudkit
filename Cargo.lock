@@ -3484,6 +3484,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "rstest",
  "serde",
  "serde_json",
  "spudkit-client",
@@ -3495,6 +3496,7 @@ name = "spudkit-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "rstest",
  "serde_json",
  "spudkit-core",
 ]
@@ -3509,6 +3511,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "hyperlocal",
+ "rstest",
  "serde_json",
  "tokio",
 ]
@@ -3518,6 +3521,7 @@ name = "spudkit-gui"
 version = "0.1.0"
 dependencies = [
  "mime_guess",
+ "rstest",
  "serde_json",
  "spudkit-client",
  "tauri",

@@ -44,7 +44,7 @@ impl SpudkitClient {
     /// Activate an app and return a connection to it.
     /// Idempotent — safe to call multiple times.
     pub async fn app(&self, app_name: &str) -> anyhow::Result<SpudkitApp> {
-        let spud = Spud::new(app_name);
+        let spud = Spud::new(app_name)?;
         self.activate(&spud).await?;
         Ok(SpudkitApp {
             conn: SpudkitConnection::new(spud.socket_path()),
