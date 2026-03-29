@@ -58,7 +58,7 @@ all: build images test e2e-all
 server:
     cargo run -p spudkit
 
-# Open an app in the GUI (usage: just app spud-hello-world)
+# Open an app in the GUI (usage: just app hello-world)
 app name:
     WEBKIT_DISABLE_DMABUF_RENDERER=1 cargo run -p spudkit-gui -- {{name}}
 

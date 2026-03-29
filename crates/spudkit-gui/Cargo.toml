@@ -9,7 +9,7 @@ repository.workspace = true
 include = ["src/**/*", "dist/**/*", "build.rs", "icons/**/*", "tauri.conf.json", "gen/**/*", "Cargo.toml"]
 
 [[bin]]
-name = "spud-app"
+name = "spud-app-tauri"
 path = "src/main.rs"
 
 [lints]
