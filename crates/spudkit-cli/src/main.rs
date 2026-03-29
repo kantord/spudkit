@@ -18,6 +18,11 @@ enum Command {
         /// Command to run inside the container
         command: Vec<String>,
     },
+    /// Open a spud in a GUI window
+    App {
+        /// Name of the spud
+        name: String,
+    },
     /// List available spuds
     Ls,
 }
@@ -28,8 +33,28 @@ async fn main() -> anyhow::Result<()> {
 
     match args.command {
         Command::Run { app, command } => run(&app, command).await,
+        Command::App { name } => app(&name),
         Command::Ls => ls().await,
     }
+}
+
+fn find_frontend() -> Option<&'static str> {
+    let candidates = ["spud-app-tauri"];
+    candidates
+        .into_iter()
+        .find(|&candidate| which::which(candidate).is_ok())
+}
+
+fn app(name: &str) -> anyhow::Result<()> {
+    let frontend = find_frontend()
+        .ok_or_else(|| anyhow::anyhow!("no GUI frontend found. Install spud-app-tauri."))?;
+
+    let status = std::process::Command::new(frontend).arg(name).status()?;
+
+    if !status.success() {
+        anyhow::bail!("{frontend} exited with {status}");
+    }
+    Ok(())
 }
 
 async fn ls() -> anyhow::Result<()> {

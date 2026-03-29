@@ -21,7 +21,7 @@ export const config: Options.Testrunner = {
     {
       "alwaysMatch": {
         "tauri:options": {
-          application: path.join(rootDir, "target/debug/spud-app"),
+          application: path.join(rootDir, "target/debug/spud-app-tauri"),
           args: ["hello-world"],
         },
       },

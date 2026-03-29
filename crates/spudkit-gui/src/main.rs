@@ -50,7 +50,7 @@ async fn stream(
 
 fn main() {
     let app_name = std::env::args().nth(1).unwrap_or_else(|| {
-        eprintln!("Usage: spud-app <app-name>");
+        eprintln!("Usage: spud-app-tauri <app-name>");
         std::process::exit(1);
     });
 
