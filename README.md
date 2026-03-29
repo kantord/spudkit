@@ -52,8 +52,9 @@ The server also exposes a management API on `/tmp/spudkit.sock`:
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/activate` | POST | Activate an app. Body: `{"image": "app-name"}`. Extracts image and starts container. |
+| `/activate` | POST | Activate an app. Body: `{"name": "app-name"}`. Starts container. |
 | `/apps` | GET | List active apps. |
+| `/spuds` | GET | List all available spuds (installed images). |
 
 ### Event types
 
@@ -181,7 +182,7 @@ spud-app book-search
 You can still use the app from the CLI:
 
 ```sh
-echo '{"query": "rabbit"}' | spud book-search search.sh
+echo '{"query": "rabbit"}' | spud run book-search search.sh
 ```
 
 ## CLI Composability
@@ -190,7 +191,31 @@ SpudKit apps work like Unix tools:
 
 ```sh
 # Pipe between apps
-spud data-loader /export.sh | spud visualizer /plot.sh
+spud run data-loader /export.sh | spud run visualizer /plot.sh
+
+# List available spuds
+spud ls
+```
+
+## Shared App Data
+
+Spuds can access host application data directories. This lets a spud share data with
+CLI tools or other apps that use the same XDG data directory.
+
+To declare which data directories a spud needs, add a label to the Dockerfile:
+
+```dockerfile
+LABEL io.github.kantord.spudkit.shared_app_data="myapp"
+```
+
+When the spud is activated, spudkit mounts `~/.local/share/myapp/` from the host
+into the container at the same path. The app inside the container can access the
+data at its standard location without needing to know it's containerized.
+
+Multiple directories are comma-separated:
+
+```dockerfile
+LABEL io.github.kantord.spudkit.shared_app_data="myapp,other-app"
 ```
 
 ## License
