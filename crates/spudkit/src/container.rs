@@ -1,17 +1,38 @@
 use bollard::Docker;
 use bollard::container::LogOutput;
 use bollard::exec::{CreateExecOptions, StartExecResults};
-use bollard::models::ContainerCreateBody;
+use bollard::models::{ContainerCreateBody, HostConfig};
 use bollard::query_parameters::{CreateContainerOptions, RemoveContainerOptions};
 use futures_util::{Stream, StreamExt};
 use spudkit_core::Spud;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 
 const SPUDKIT_LABEL: &str = "io.github.kantord.spudkit.version";
+const SHARED_APP_DATA_LABEL: &str = "io.github.kantord.spudkit.shared_app_data";
+
+pub struct BindMount {
+    pub host_path: PathBuf,
+    pub container_path: String,
+}
+
+impl BindMount {
+    pub fn from_app_data_name(name: &str, host_data_dir: &Path) -> Self {
+        Self {
+            host_path: host_data_dir.join(name),
+            container_path: format!("/root/.local/share/{name}"),
+        }
+    }
+
+    pub fn to_bind_string(&self) -> String {
+        format!("{}:{}:rw", self.host_path.display(), self.container_path)
+    }
+}
 
 /// A validated spudkit container image.
 pub struct SpudkitImage {
     spud: Spud,
+    mounts: Vec<BindMount>,
 }
 
 impl SpudkitImage {
@@ -21,17 +42,22 @@ impl SpudkitImage {
     }
 
     /// Validate that a spud's image carries the spudkit label.
+    /// Uses the system's XDG data directory for shared app data mounts.
     pub async fn from_spud(spud: Spud) -> anyhow::Result<Self> {
+        let data_dir = dirs::data_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
+        Self::from_spud_with_data_dir(spud, &data_dir).await
+    }
+
+    /// Validate that a spud's image carries the spudkit label,
+    /// using a custom host data directory for shared app data mounts.
+    pub async fn from_spud_with_data_dir(spud: Spud, host_data_dir: &Path) -> anyhow::Result<Self> {
         let image_name = format!("spud-{}", spud.name());
         let docker = Docker::connect_with_local_defaults()?;
         let info = docker.inspect_image(&image_name).await?;
 
-        let has_label = info
-            .config
-            .as_ref()
-            .and_then(|c| c.labels.as_ref())
-            .and_then(|labels| labels.get(SPUDKIT_LABEL))
-            .is_some();
+        let labels = info.config.as_ref().and_then(|c| c.labels.as_ref());
+
+        let has_label = labels.and_then(|l| l.get(SPUDKIT_LABEL)).is_some();
 
         if !has_label {
             anyhow::bail!(
@@ -39,7 +65,17 @@ impl SpudkitImage {
             );
         }
 
-        Ok(Self { spud })
+        let mounts = labels
+            .and_then(|l| l.get(SHARED_APP_DATA_LABEL))
+            .map(|value| {
+                value
+                    .split(',')
+                    .map(|name| BindMount::from_app_data_name(name.trim(), host_data_dir))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Ok(Self { spud, mounts })
     }
 
     pub fn spud(&self) -> &Spud {
@@ -78,9 +114,20 @@ impl SpudkitImage {
     pub async fn start(&self) -> anyhow::Result<AppContainer> {
         let docker = Docker::connect_with_local_defaults()?;
 
+        let binds: Vec<String> = self.mounts.iter().map(|m| m.to_bind_string()).collect();
+        let host_config = if binds.is_empty() {
+            None
+        } else {
+            Some(HostConfig {
+                binds: Some(binds),
+                ..Default::default()
+            })
+        };
+
         let config = ContainerCreateBody {
             image: Some(self.image_name()),
             cmd: Some(vec!["sleep".to_string(), "infinity".to_string()]),
+            host_config,
             ..Default::default()
         };
 

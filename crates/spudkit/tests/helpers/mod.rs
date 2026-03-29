@@ -137,8 +137,15 @@ pub fn non_started_events(events: Vec<serde_json::Value>) -> Vec<serde_json::Val
 }
 
 pub fn build_labeled_image(name: &str) {
-    let dockerfile =
+    build_labeled_image_with_extra(name, "");
+}
+
+pub fn build_labeled_image_with_extra(name: &str, extra_labels: &str) {
+    let mut dockerfile =
         "FROM debian:bookworm-slim\nLABEL io.github.kantord.spudkit.version=\"1\"".to_string();
+    if !extra_labels.is_empty() {
+        dockerfile.push_str(&format!("\n{extra_labels}"));
+    }
     let output = std::process::Command::new("docker")
         .args(["build", "-t", name, "-"])
         .stdin(std::process::Stdio::piped())
