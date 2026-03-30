@@ -1,7 +1,7 @@
 use spudkit_client::SpudkitClient;
 use spudkit_core::Spud;
-use std::process::Command;
 use tokio::net::{TcpListener, UnixStream};
+use tokio::process::Command;
 
 fn find_chrome() -> anyhow::Result<String> {
     let candidates = [
@@ -71,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
         .spawn()?;
 
     // Wait for Chrome to exit
-    let status = child.wait()?;
+    let status = child.wait().await?;
 
     // Shut down the proxy
     proxy_handle.abort();
