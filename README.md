@@ -41,12 +41,12 @@ graph TB
 
 ## The Streaming API
 
-`POST /calls` creates a call and returns an SSE stream. The first event is `started` with a `call_id` that can be used to send stdin:
+`POST /_api/calls` creates a call and returns an SSE stream. The first event is `started` with a `call_id` that can be used to send stdin:
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/calls` | POST | Create a call and stream output. Body: `{"cmd": ["/script.sh"]}`. Returns SSE stream. |
-| `/calls/{id}/stdin` | POST | Send input to a running process. Body: `{"data": {...}}`. |
+| `/_api/calls` | POST | Create a call and stream output. Body: `{"cmd": ["/script.sh"]}`. Returns SSE stream. |
+| `/_api/calls/{id}/stdin` | POST | Send input to a running process. Body: `{"data": {...}}`. |
 
 The server also exposes a management API on `/tmp/spudkit.sock`:
 
@@ -78,21 +78,21 @@ SpudKit app frontends are just static web files. You can use any frontend techno
 - **React / Vue / Svelte** — use Vite or any bundler. The build output goes in `/app/gui/`.
 - **Vanilla JS** — just HTML, CSS, and `<script>` tags.
 
-For JS-based frontends, use the streaming `/calls` API to get real-time output from
-your backend scripts (word-by-word, line-by-line). For HTMX, use the `/render` endpoint
+For JS-based frontends, use the streaming `/_api/calls` API to get real-time output from
+your backend scripts (word-by-word, line-by-line). For HTMX, use the `/_api/render` endpoint
 which collects all output and returns rendered HTML — simpler, but not streaming.
 
 ## HTMX Support
 
 SpudKit has built-in support for [HTMX](https://htmx.org/), making it possible to write web apps without having to write JavaScript.
 
-> **Note:** The `/render` endpoint waits for the script to finish before returning HTML.
-> For real-time streaming (e.g., chat, progress updates), use the `/calls` API with
+> **Note:** The `/_api/render` endpoint waits for the script to finish before returning HTML.
+> For real-time streaming (e.g., chat, progress updates), use the `/_api/calls` API with
 > JavaScript instead.
 
 ### How it works
 
-The `/render/{script}` endpoint runs a script, collects its output, renders it
+The `/_api/render/{script}` endpoint runs a script, collects its output, renders it
 through a [Jinja2 template](https://jinja.palletsprojects.com/), and returns HTML.
 
 The template rendering system is a convenience feature added to make it convenient to use HTMX.
@@ -145,7 +145,7 @@ grep -i -n "$query" /book.txt
 <body>
     <main class="container">
         <h1>Book Search</h1>
-        <form hx-post="/render/search.sh" hx-target="#results">
+        <form hx-post="/_api/render/search.sh" hx-target="#results">
             <fieldset role="group">
                 <input type="text" name="query" placeholder="Search..." autofocus />
                 <button type="submit">Search</button>

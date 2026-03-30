@@ -4,8 +4,8 @@ import { BatchInterceptor } from "@mswjs/interceptors";
 import { forwardRequest } from "./forward";
 import { streamRequest } from "./stream";
 
-const STREAMING_PATHS = [/^\/calls$/];
-const FORWARD_PATHS = [/^\/calls\//, /^\/render\//];
+const STREAMING_PATHS = [/^\/_api\/calls$/];
+const FORWARD_PATHS = [/^\/_api\/calls\//, /^\/_api\/render\//];
 
 function isStreamingRoute(method: string, path: string): boolean {
   return method === "POST" && STREAMING_PATHS.some((p) => p.test(path));
