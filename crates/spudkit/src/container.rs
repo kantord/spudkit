@@ -118,6 +118,12 @@ impl SpudkitImage {
         let container_name = format!("spudkit-{unique_id}");
         let exec_socket_dir = PathBuf::from(format!("/tmp/spudkit-exec-{unique_id}"));
         tokio::fs::create_dir_all(&exec_socket_dir).await?;
+        // Restrict to owner-only so other host processes can't place symlinks
+        // inside the directory before the container's socket is created.
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&exec_socket_dir, std::fs::Permissions::from_mode(0o700))?;
+        }
 
         let mut binds: Vec<String> = self.mounts.iter().map(|m| m.to_bind_string()).collect();
         binds.push(format!("{}:/run/spudkit:rw", exec_socket_dir.display()));
@@ -201,19 +207,23 @@ impl AppContainer {
     pub async fn call(&self, cmd: &[String]) -> anyhow::Result<ExecAttached> {
         if let Some(ref socket_dir) = self.exec_socket_dir {
             let socket_path = socket_dir.join("exec.sock");
-            if socket_path.exists() {
-                let first = cmd.first().map(|s| s.as_str()).unwrap_or("");
-                let script_name = if let Some(name) = first.strip_prefix("/app/bin/") {
-                    Some(name)
-                } else if !first.starts_with('/') {
-                    Some(first)
-                } else {
-                    None
-                };
-                if let Some(name) = script_name
-                    && cmd.len() == 1
-                {
-                    return self.call_via_socket(&socket_path, name).await;
+            let first = cmd.first().map(|s| s.as_str()).unwrap_or("");
+            let script_name = if let Some(name) = first.strip_prefix("/app/bin/") {
+                Some(name)
+            } else if !first.starts_with('/') {
+                Some(first)
+            } else {
+                None
+            };
+            if let Some(name) = script_name
+                && cmd.len() == 1
+                && !name.contains('\n')
+                && !name.contains('\r')
+            {
+                // Try the socket path; fall back to exec on any connection error
+                // (e.g. socket not yet created, TOCTOU between check and connect).
+                if let Ok(attached) = self.call_via_socket(&socket_path, name).await {
+                    return Ok(attached);
                 }
             }
         }
@@ -254,8 +264,9 @@ impl AppContainer {
             }
             let message = bytes::Bytes::from(payload);
             let log = match stream_type {
+                0x01 => LogOutput::StdOut { message },
                 0x02 => LogOutput::StdErr { message },
-                _ => LogOutput::StdOut { message },
+                _ => return None, // unknown stream type — skip frame
             };
             Some((Ok::<_, bollard::errors::Error>(log), Some(reader)))
         });

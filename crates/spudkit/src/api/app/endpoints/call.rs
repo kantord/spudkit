@@ -24,7 +24,7 @@ pub(crate) async fn handler(
     let call_id = crate::utils::generate_id();
     let container = state.container.clone();
     let stdin_writers = state.stdin_writers.clone();
-    let cid = call_id.clone();
+    let call_id_owned = call_id.clone();
 
     tokio::spawn(async move {
         let resolved_cmd = crate::utils::resolve_cmd(&body.cmd);
@@ -34,11 +34,14 @@ pub(crate) async fn handler(
         };
 
         let stdin_writer: StdinWriter = Arc::new(Mutex::new(Some(attached.input)));
-        stdin_writers.lock().await.insert(cid.clone(), stdin_writer);
+        stdin_writers
+            .lock()
+            .await
+            .insert(call_id_owned.clone(), stdin_writer);
 
         let _ = stream
             .send(SseEvent::Started {
-                call_id: cid.clone(),
+                call_id: call_id_owned.clone(),
             })
             .await;
 
@@ -70,7 +73,7 @@ pub(crate) async fn handler(
         }
 
         let _ = stream.send(SseEvent::End).await;
-        stdin_writers.lock().await.remove(&cid);
+        stdin_writers.lock().await.remove(&call_id_owned);
     });
 
     sse

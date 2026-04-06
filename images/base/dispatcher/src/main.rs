@@ -68,6 +68,7 @@ fn main() {
         use std::os::fd::FromRawFd;
         std::fs::File::from_raw_fd(0)
     });
+    const MAX_CMD_LEN: usize = 255;
     let mut cmd = String::new();
     let mut byte = [0u8; 1];
     loop {
@@ -76,6 +77,9 @@ fn main() {
             Ok(_) => {
                 if byte[0] == b'\n' {
                     break;
+                }
+                if cmd.len() >= MAX_CMD_LEN {
+                    std::process::exit(1);
                 }
                 cmd.push(byte[0] as char);
             }
