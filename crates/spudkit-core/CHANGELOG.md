@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/kantord/spudkit/compare/spudkit-core-v0.1.2...spudkit-core-v0.1.3) - 2026-04-08
+
+### Fixed
+
+- *(deps)* update rust crate tokio to v1.51.0 ([#69](https://github.com/kantord/spudkit/pull/69))
+- *(deps)* update rust crate hyper to v1.9.0 ([#66](https://github.com/kantord/spudkit/pull/66))
+
+### Other
+
+- fix release/build issues ([#77](https://github.com/kantord/spudkit/pull/77))
+
 ## [0.1.1](https://github.com/kantord/spudkit/compare/spudkit-core-v0.1.0...spudkit-core-v0.1.1) - 2026-03-29
 
 ### Added
