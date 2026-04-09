@@ -3,8 +3,7 @@ use spudkit_core::Spud;
 use std::path::Path;
 
 fn normalize_build_tag(tag: &str) -> anyhow::Result<String> {
-    let name = tag.strip_prefix("spud-").unwrap_or(tag);
-    let spud = Spud::new(name)?;
+    let spud = Spud::new(tag)?;
     Ok(spud.name().to_string())
 }
 
@@ -55,10 +54,10 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn normalize_build_tag_strips_spud_prefix() {
+    fn normalize_build_tag_accepts_spud_prefix_as_part_of_name() {
         assert_eq!(
-            normalize_build_tag("spud-hello-world").unwrap(),
-            "hello-world"
+            normalize_build_tag("spud-launcher").unwrap(),
+            "spud-launcher"
         );
     }
 
@@ -69,7 +68,7 @@ mod tests {
 
     #[test]
     fn normalize_build_tag_rejects_invalid_name() {
-        assert!(normalize_build_tag("spud-../etc").is_err());
+        assert!(normalize_build_tag("../etc").is_err());
     }
 
     #[test]
