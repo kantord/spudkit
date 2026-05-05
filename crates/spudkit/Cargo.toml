@@ -14,7 +14,7 @@ axum = { version = "=0.8.9", features = ["ws"] }
 tokio = { version = "1.51.0", features = ["full"] }
 hyper-util = { version = "=0.1.20", features = ["tokio"] }
 tower = "=0.5.3"
-bollard = "=0.20.2"
+bollard = "=0.21.0"
 futures-util = "=0.3.32"
 mime_guess = "=2.0.5"
 serde = { version = "=1.0.228", features = ["derive"] }
