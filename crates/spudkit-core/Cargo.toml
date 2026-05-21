@@ -11,7 +11,7 @@ workspace = true
 
 [dependencies]
 anyhow = "=1.0.102"
-serde_json = "=1.0.149"
+serde_json = "=1.0.150"
 hyper = "=1.9.0"
 hyper-util = { version = "=0.1.20", features = ["client-legacy", "tokio"] }
 hyperlocal = "=0.9.1"
