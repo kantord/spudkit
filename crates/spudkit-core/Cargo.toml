@@ -12,7 +12,7 @@ workspace = true
 [dependencies]
 anyhow = "=1.0.102"
 serde_json = "=1.0.150"
-hyper = "=1.10.0"
+hyper = "=1.10.1"
 hyper-util = { version = "=0.1.20", features = ["client-legacy", "tokio"] }
 hyperlocal = "=0.9.1"
 http-body-util = "=0.1.3"
