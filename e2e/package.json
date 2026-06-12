@@ -7,7 +7,7 @@
     "test:all": "wdio run wdio.conf.ts && wdio run wdio.book-search.conf.ts"
   },
   "devDependencies": {
-    "@types/node": "24.13.1",
+    "@types/node": "24.13.2",
     "@wdio/cli": "9.28.0",
     "@wdio/local-runner": "9.28.0",
     "@wdio/mocha-framework": "9.28.0",
