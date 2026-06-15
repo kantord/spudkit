@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/kantord/spudkit/compare/spud-app-chromium-v0.1.3...spud-app-chromium-v0.1.4) - 2026-06-15
+
+### Added
+
+- add chrome-based frontend
+
+### Fixed
+
+- *(deps)* update rust crate which to v8.0.3 ([#180](https://github.com/kantord/spudkit/pull/180))
+- *(deps)* update rust crate tokio to v1.51.0 ([#69](https://github.com/kantord/spudkit/pull/69))
+- *(deps)* update rust crate which to v8 ([#65](https://github.com/kantord/spudkit/pull/65))
+- *(deps)* update rust crate tempfile to v3.27.0 ([#64](https://github.com/kantord/spudkit/pull/64))
+
+### Other
+
+- release v0.1.3 ([#67](https://github.com/kantord/spudkit/pull/67))
+- fix release/build issues ([#77](https://github.com/kantord/spudkit/pull/77))
+- release v0.1.2 ([#58](https://github.com/kantord/spudkit/pull/58))
+
 ## [0.1.3](https://github.com/kantord/spudkit/compare/spud-app-chromium-v0.1.2...spud-app-chromium-v0.1.3) - 2026-04-08
 
 ### Added

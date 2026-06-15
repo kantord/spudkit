@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/kantord/spudkit/compare/spudkit-core-v0.1.3...spudkit-core-v0.1.4) - 2026-06-15
+
+### Fixed
+
+- *(deps)* update rust crate hyper to v1.10.1 ([#171](https://github.com/kantord/spudkit/pull/171))
+- *(deps)* update rust crate hyper to v1.10.0 ([#167](https://github.com/kantord/spudkit/pull/167))
+- *(deps)* update rust crate serde_json to v1.0.150 ([#160](https://github.com/kantord/spudkit/pull/160))
+
 ## [0.1.3](https://github.com/kantord/spudkit/compare/spudkit-core-v0.1.2...spudkit-core-v0.1.3) - 2026-04-08
 
 ### Fixed
