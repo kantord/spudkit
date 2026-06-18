@@ -26,4 +26,4 @@ mime_guess = "=2.0.5"
 rstest.workspace = true
 
 [build-dependencies]
-tauri-build = "=2.6.2"
+tauri-build = "=2.6.3"
