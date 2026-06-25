@@ -1,4 +1,4 @@
-FROM node:24.17.0-slim AS frontend
+FROM node:24.18.0-slim AS frontend
 WORKDIR /build
 RUN corepack enable pnpm
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
