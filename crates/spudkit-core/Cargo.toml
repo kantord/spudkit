@@ -10,7 +10,7 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-anyhow = "=1.0.102"
+anyhow = "=1.0.103"
 serde_json = "=1.0.150"
 hyper = "=1.10.1"
 hyper-util = { version = "=0.1.20", features = ["client-legacy", "tokio"] }
