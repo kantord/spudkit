@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/kantord/spudkit/compare/spudkit-v0.1.1...spudkit-v0.1.4) - 2026-07-02
+
+### Added
+
+- add chrome-based frontend
+
+### Fixed
+
+- *(deps)* update rust crate anyhow to v1.0.103 ([#216](https://github.com/kantord/spudkit/pull/216))
+- *(deps)* update rust crate uuid to v1.23.4 ([#214](https://github.com/kantord/spudkit/pull/214))
+- *(deps)* update rust crate bytes to v1.12.0 ([#202](https://github.com/kantord/spudkit/pull/202))
+- *(deps)* update rust crate minijinja to v2.21.0 ([#200](https://github.com/kantord/spudkit/pull/200))
+- *(deps)* update rust crate uuid to v1.23.3 ([#182](https://github.com/kantord/spudkit/pull/182))
+- *(deps)* update rust crate hyper to v1.10.1 ([#171](https://github.com/kantord/spudkit/pull/171))
+- *(deps)* update rust crate uuid to v1.23.2 ([#170](https://github.com/kantord/spudkit/pull/170))
+- *(deps)* update rust crate hyper to v1.10.0 ([#167](https://github.com/kantord/spudkit/pull/167))
+- *(deps)* update rust crate serde_json to v1.0.150 ([#160](https://github.com/kantord/spudkit/pull/160))
+- *(deps)* update rust crate minijinja to v2.20.0 ([#158](https://github.com/kantord/spudkit/pull/158))
+- *(deps)* update rust crate bollard to v0.21.0 ([#130](https://github.com/kantord/spudkit/pull/130))
+- *(deps)* update rust crate uuid to v1.23.1 ([#92](https://github.com/kantord/spudkit/pull/92))
+- *(deps)* update rust crate clap to v4.6.1 ([#91](https://github.com/kantord/spudkit/pull/91))
+- *(deps)* update rust crate axum to v0.8.9 ([#89](https://github.com/kantord/spudkit/pull/89))
+- *(deps)* update rust crate tokio to v1.51.0 ([#69](https://github.com/kantord/spudkit/pull/69))
+- *(deps)* update rust crate minijinja to v2.19.0 ([#68](https://github.com/kantord/spudkit/pull/68))
+- *(deps)* update rust crate hyper to v1.9.0 ([#66](https://github.com/kantord/spudkit/pull/66))
+- buffer partial lines across Docker stream chunks in run() ([#57](https://github.com/kantord/spudkit/pull/57))
+
+### Other
+
+- release v0.1.3 ([#67](https://github.com/kantord/spudkit/pull/67))
+- fix release/build issues ([#77](https://github.com/kantord/spudkit/pull/77))
+- improve input streaming performance ([#74](https://github.com/kantord/spudkit/pull/74))
+- reduce containerization overhead for calls ([#73](https://github.com/kantord/spudkit/pull/73))
+- release v0.1.2 ([#58](https://github.com/kantord/spudkit/pull/58))
+
 ## [0.1.3](https://github.com/kantord/spudkit/compare/spudkit-v0.1.1...spudkit-v0.1.3) - 2026-04-08
 
 ### Added
