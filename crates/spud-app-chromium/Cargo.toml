@@ -13,7 +13,7 @@ workspace = true
 spudkit-client.workspace = true
 spudkit-core.workspace = true
 tokio = { version = "1.51.0", features = ["rt-multi-thread", "macros", "net", "io-util", "process"] }
-anyhow = "=1.0.103"
+anyhow = "=1.0.104"
 which = "=8.0.5"
 tempfile = "=3.27.0"
 
