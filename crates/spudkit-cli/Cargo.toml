@@ -25,7 +25,7 @@ which = "=8.0.5"
 tar = "0.4"
 walkdir = "2"
 bollard = "=0.21.0"
-futures-util = "=0.3.32"
+futures-util = "=0.3.33"
 
 [dev-dependencies]
 rstest.workspace = true
