@@ -8,9 +8,9 @@
   },
   "devDependencies": {
     "@types/node": "24.13.3",
-    "@wdio/cli": "9.29.1",
-    "@wdio/local-runner": "9.29.1",
-    "@wdio/mocha-framework": "9.29.1",
+    "@wdio/cli": "9.30.0",
+    "@wdio/local-runner": "9.30.0",
+    "@wdio/mocha-framework": "9.30.0",
     "@wdio/spec-reporter": "9.29.1",
     "ts-node": "10.9.2",
     "typescript": "7.0.2"
