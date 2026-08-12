@@ -31,6 +31,6 @@ bytes = "=1.12.1"
 
 [dev-dependencies]
 hyper = "=1.11.0"
-http-body-util = "=0.1.4"
+http-body-util = "=0.1.5"
 tower = { version = "=0.5.3", features = ["util"] }
 rstest.workspace = true

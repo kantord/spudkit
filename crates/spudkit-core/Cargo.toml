@@ -15,7 +15,7 @@ serde_json = "=1.0.151"
 hyper = "=1.11.0"
 hyper-util = { version = "=0.1.20", features = ["client-legacy", "tokio"] }
 hyperlocal = "=0.9.1"
-http-body-util = "=0.1.4"
+http-body-util = "=0.1.5"
 bytes = "=1.12.1"
 tokio = { version = "1.51.0", features = ["rt"] }
 
