@@ -16,7 +16,7 @@
     "vite": "8.2.2"
   },
   "dependencies": {
-    "@mswjs/interceptors": "0.42.4",
+    "@mswjs/interceptors": "0.42.5",
     "@tauri-apps/api": "2.11.1"
   }
 }
