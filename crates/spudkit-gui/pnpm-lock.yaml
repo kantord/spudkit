@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@mswjs/interceptors':
-        specifier: 0.45.6
-        version: 0.45.6
+        specifier: 0.45.7
+        version: 0.45.7
       '@tauri-apps/api':
         specifier: 2.11.1
         version: 2.11.1
@@ -27,8 +27,8 @@ importers:
 
 packages:
 
-  '@mswjs/interceptors@0.45.6':
-    resolution: {integrity: sha512-qdBK6aOT5Qjt+cmU/XcobZjjmrIsdiQRR6hA0LP72uB7CRx+XfAjm8Opvgia8nX9kPOKqp+BKHuzMa1IFPTvyg==}
+  '@mswjs/interceptors@0.45.7':
+    resolution: {integrity: sha512-PPZQBiojRuy1jJQoUqbrJhoac47GC1GwRazDrYwwbE70zfqMkOY/5a+Du4hp3vlPUXLt/um4TMcmRabmooAkxw==}
     engines: {node: '>=22'}
 
   '@open-draft/until@3.0.1':
@@ -533,7 +533,7 @@ packages:
 
 snapshots:
 
-  '@mswjs/interceptors@0.45.6':
+  '@mswjs/interceptors@0.45.7':
     dependencies:
       '@open-draft/until': 3.0.1
       '@types/debug': 4.1.13
