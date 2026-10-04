@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@mswjs/interceptors':
-        specifier: 0.45.3
-        version: 0.45.3
+        specifier: 0.45.6
+        version: 0.45.6
       '@tauri-apps/api':
         specifier: 2.11.1
         version: 2.11.1
@@ -27,8 +27,8 @@ importers:
 
 packages:
 
-  '@mswjs/interceptors@0.45.3':
-    resolution: {integrity: sha512-r42R8bsUA35xUkYO/unzoDWYzVlhsMi5216QL1CwoFVh8aSaOlKKelRRnWDewHPiehiHZLWheYRIOOv1eVNwyw==}
+  '@mswjs/interceptors@0.45.6':
+    resolution: {integrity: sha512-qdBK6aOT5Qjt+cmU/XcobZjjmrIsdiQRR6hA0LP72uB7CRx+XfAjm8Opvgia8nX9kPOKqp+BKHuzMa1IFPTvyg==}
     engines: {node: '>=22'}
 
   '@open-draft/until@3.0.1':
@@ -467,8 +467,8 @@ packages:
     resolution: {integrity: sha512-RRuzqDtt5Y9h3quz5hWhK+TPnsmVs6WwSU6LkJMeY4HstUEDuYTG8UJSdawMRzmzAtV+KEoG8N3Qg2qLy5vM/A==}
     engines: {node: ^10 || ^12 || >=14}
 
-  rettime@0.11.11:
-    resolution: {integrity: sha512-ILJRqVWBCTlg9r42fFgwVZx1gnFAcQF8mRoMkbgQfIrjEDf9nbBFDFx00oloOa+Q869FUtaYDXZvEfnecQSCoQ==}
+  rettime@0.11.12:
+    resolution: {integrity: sha512-5ExtR1ppiDBQkVoPw5NAqdbfH4Iq2VOmQKHMtUoaFxA9bo2krzFYBtyq6K40xxbYp+2w/YOr6D+1ToF6tTN53A==}
 
   rolldown@1.2.12:
     resolution: {integrity: sha512-8wafseiaG80xmXSfqidUNqZcylTlhmPZZt+za2m+js2sFZ8dTNlhIOV2WcbIPx2hgwPBJpEUGFAMZ9bgBBLTSQ==}
@@ -533,14 +533,14 @@ packages:
 
 snapshots:
 
-  '@mswjs/interceptors@0.45.3':
+  '@mswjs/interceptors@0.45.6':
     dependencies:
       '@open-draft/until': 3.0.1
       '@types/debug': 4.1.13
       debug: 4.4.3
       is-node-process: 1.2.0
       outvariant: 1.4.3
-      rettime: 0.11.11
+      rettime: 0.11.12
     transitivePeerDependencies:
       - supports-color
 
@@ -790,7 +790,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  rettime@0.11.11: {}
+  rettime@0.11.12: {}
 
   rolldown@1.2.12:
     dependencies:
