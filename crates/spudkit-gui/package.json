@@ -17,6 +17,6 @@
   },
   "dependencies": {
     "@mswjs/interceptors": "0.45.7",
-    "@tauri-apps/api": "2.12.1"
+    "@tauri-apps/api": "2.12.2"
   }
 }
