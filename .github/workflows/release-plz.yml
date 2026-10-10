@@ -35,7 +35,7 @@ jobs:
       - name: Build polyfill
         run: cd crates/spudkit-gui && pnpm install && pnpm build
       - name: Run release-plz
-        uses: release-plz/action@18641b6c63063cc5ff8786ebf69cd57e8541bae1 # v0.5
+        uses: release-plz/action@f393a7b38aca9d9b4c58447b291dbac963901df6 # v0.5
         with:
           command: release
         env:
@@ -70,7 +70,7 @@ jobs:
       - name: Build polyfill
         run: cd crates/spudkit-gui && pnpm install && pnpm build
       - name: Run release-plz
-        uses: release-plz/action@18641b6c63063cc5ff8786ebf69cd57e8541bae1 # v0.5
+        uses: release-plz/action@f393a7b38aca9d9b4c58447b291dbac963901df6 # v0.5
         with:
           command: release-pr
         env:
