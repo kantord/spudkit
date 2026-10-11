@@ -18,7 +18,7 @@ workspace = true
 [dependencies]
 tauri = { version = "=2.12.2", features = [] }
 tokio = { version = "1.51.0", features = ["full"] }
-serde_json = "=1.0.151"
+serde_json = "=1.0.152"
 spudkit-client.workspace = true
 mime_guess = "=2.0.5"
 

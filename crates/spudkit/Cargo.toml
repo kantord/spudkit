@@ -18,7 +18,7 @@ bollard = "=0.21.1"
 futures-util = "=0.3.34"
 mime_guess = "=2.0.5"
 serde = { version = "=1.0.229", features = ["derive"] }
-serde_json = "=1.0.151"
+serde_json = "=1.0.152"
 tokio-stream = "=0.1.19"
 uuid = { version = "=1.28.0", features = ["v4"] }
 anyhow = "=1.0.104"
