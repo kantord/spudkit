@@ -12,7 +12,7 @@ workspace = true
 [dependencies]
 spudkit-core.workspace = true
 anyhow = "=1.0.104"
-serde_json = "=1.0.152"
+serde_json = "=1.0.154"
 
 [dev-dependencies]
 rstest.workspace = true
